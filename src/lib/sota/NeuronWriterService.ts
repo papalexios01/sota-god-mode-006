@@ -43,19 +43,20 @@ export interface NeuronWriterCompetitor {
 
 // Determine the best proxy URL for NeuronWriter API calls
 function getProxyUrl(): string {
-  // Check for Supabase functions first
+  // Check for Supabase functions first (preferred)
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   if (supabaseUrl) {
     return `${supabaseUrl}/functions/v1/neuronwriter-proxy`;
   }
   
-  // Fallback to Cloudflare Pages functions
+  // Fallback to Cloudflare Pages functions (only works in production)
   return '/api/neuronwriter';
 }
 
 export class NeuronWriterService {
   private apiKey: string;
   private proxyUrl: string;
+  private isProxyAvailable: boolean = true;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey.trim();
@@ -82,7 +83,35 @@ export class NeuronWriterService {
         }),
       });
 
-      const result = await response.json();
+      // Handle 404 - proxy not available
+      if (response.status === 404) {
+        this.isProxyAvailable = false;
+        return { 
+          success: false, 
+          error: 'NeuronWriter proxy not available. Enable Lovable Cloud or deploy to production for NeuronWriter integration.' 
+        };
+      }
+
+      // Handle empty response
+      const text = await response.text();
+      if (!text || text.trim() === '') {
+        return { 
+          success: false, 
+          error: 'Empty response from proxy' 
+        };
+      }
+
+      // Try to parse JSON
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (parseError) {
+        console.error('[NeuronWriter] Failed to parse response:', text.substring(0, 200));
+        return { 
+          success: false, 
+          error: `Invalid response from proxy: ${text.substring(0, 100)}` 
+        };
+      }
       
       if (!result.success) {
         return { 
@@ -102,6 +131,13 @@ export class NeuronWriterService {
         error: error instanceof Error ? error.message : 'Network error' 
       };
     }
+  }
+
+  /**
+   * Check if proxy is available
+   */
+  isAvailable(): boolean {
+    return this.isProxyAvailable;
   }
 
   /**

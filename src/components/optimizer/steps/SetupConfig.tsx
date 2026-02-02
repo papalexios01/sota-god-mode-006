@@ -484,9 +484,19 @@ export function SetupConfig() {
                 )}
 
                 {neuronWriterError && (
-                  <div className="flex items-center gap-2 text-red-400 text-sm">
-                    <AlertCircle className="w-4 h-4" />
-                    {neuronWriterError}
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div className="flex items-start gap-2 text-red-400 text-sm">
+                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium">{neuronWriterError}</p>
+                        {neuronWriterError.includes('proxy not available') && (
+                          <p className="text-xs mt-1 text-red-300/80">
+                            NeuronWriter requires a backend proxy due to CORS restrictions. 
+                            Enable Lovable Cloud or deploy to Cloudflare Pages for this feature.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -516,7 +526,7 @@ export function SetupConfig() {
 
                 {!neuronWriterLoading && !neuronWriterError && neuronWriterProjects.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No projects found. Create a project in NeuronWriter first.
+                    No projects found. Create a project in NeuronWriter first, or check your API key.
                   </p>
                 )}
               </div>
