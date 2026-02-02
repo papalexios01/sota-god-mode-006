@@ -122,7 +122,7 @@ export class NeuronWriterService {
     try {
       console.log(`[NeuronWriter] Invoking Supabase function: ${endpoint}`);
       
-      const { data, error } = await supabase!.functions.invoke('neuronwriter-proxy', {
+      const { data, error } = await supabase!.functions.invoke('hyper-worker', {
         body: {
           endpoint,
           method,
@@ -159,7 +159,7 @@ export class NeuronWriterService {
     method: string,
     body?: Record<string, unknown>
   ): Promise<{ success: boolean; data?: T; error?: string }> {
-    const proxyUrl = `${supabaseUrl}/functions/v1/neuronwriter-proxy`;
+    const proxyUrl = `${supabaseUrl}/functions/v1/hyper-worker`;
     
     try {
       console.log(`[NeuronWriter] Direct proxy call: ${endpoint}`);
