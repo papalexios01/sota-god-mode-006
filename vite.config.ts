@@ -1,17 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
+import path from 'path';
+import { componentTagger } from 'lovable-tagger';
 
-export default defineConfig({
-  plugins: [react()],
-  
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src'),
-    },
-  },
-
+export default defineConfig(({ mode }) => ({
   server: {
+    host: '::',
     port: 8080,
     hmr: {
       overlay: false,
@@ -20,15 +14,23 @@ export default defineConfig({
       '/api/proxy': {
         target: 'https://api.allorigins.win',
         changeOrigin: true,
-        rewrite: (path) => {
-          const url = new URL(path, 'http://localhost');
+        rewrite: (p) => {
+          const url = new URL(p, 'http://localhost');
           const targetUrl = url.searchParams.get('url');
           return `/raw?url=${targetUrl}`;
         },
       },
     },
   },
-  
+  plugins: [
+    react(),
+    mode === 'development' && componentTagger(),
+  ].filter(Boolean),
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   build: {
     target: 'esnext',
     outDir: 'dist',
@@ -44,12 +46,10 @@ export default defineConfig({
       },
     },
   },
-  
   define: {
     'process.env': {},
   },
-  
   optimizeDeps: {
     exclude: ['@anthropic-ai/sdk'],
   },
-});
+}));
