@@ -1,139 +1,43 @@
 
-# NeuronWriter CORS Fix via Supabase Edge Function
+# Update NeuronWriter to Use Your Deployed Edge Function
 
-## Problem Analysis
-The NeuronWriter API is failing with CORS errors because:
-1. Browser security prevents direct API calls to `app.neuronwriter.com`
-2. The existing Supabase edge function (`supabase/functions/neuronwriter-proxy/index.ts`) exists but is **not deployed**
-3. No Supabase connection is configured - missing `VITE_SUPABASE_URL`
-4. Missing `supabase/config.toml` configuration file
+## Summary
+Your edge function is deployed as `hyper-worker` but our code is calling `neuronwriter-proxy`. We need to update the function name in the code to match your deployment.
 
-## Solution Overview
-Connect to Lovable Cloud (Supabase backend), configure the edge function properly, and update the frontend to use it.
+## Changes Required
 
-```text
-┌──────────────────┐     ┌────────────────────┐     ┌─────────────────────┐
-│   Browser/App    │────▶│ Supabase Edge Func │────▶│ NeuronWriter API    │
-│                  │     │ neuronwriter-proxy │     │ app.neuronwriter.com│
-│  No CORS issues  │◀────│  (server-side)     │◀────│                     │
-└──────────────────┘     └────────────────────┘     └─────────────────────┘
+### 1. Update NeuronWriterService.ts
+**File:** `src/lib/sota/NeuronWriterService.ts`
+
+Change line 125 from:
+```typescript
+const { data, error } = await supabase!.functions.invoke('neuronwriter-proxy', {
 ```
 
----
-
-## Implementation Steps
-
-### Step 1: Enable Lovable Cloud Connection
-This will automatically provision a Supabase backend and provide the required environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
-
-### Step 2: Create Supabase Configuration
-Create `supabase/config.toml` to properly register the edge functions:
-
-```toml
-project_id = "default"
-
-[functions.neuronwriter-proxy]
-verify_jwt = false
-
-[functions.fetch-sitemap]
-verify_jwt = false
+To:
+```typescript
+const { data, error } = await supabase!.functions.invoke('hyper-worker', {
 ```
 
-### Step 3: Update Edge Function (Minor Improvements)
-Enhance the existing `neuronwriter-proxy/index.ts` with:
-- Better error logging for debugging
-- Extended CORS headers for Supabase client compatibility
-- Improved timeout handling per endpoint type
+### 2. Verify Supabase Client Configuration
+**File:** `src/integrations/supabase/client.ts`
 
-### Step 4: Create Supabase Client Integration
-Create `src/integrations/supabase/client.ts` to properly initialize the Supabase client for calling edge functions.
+Ensure `VITE_SUPABASE_URL` is set to:
+```
+https://ousxeycrhvuwaejhpqgv.supabase.co
+```
 
-### Step 5: Update NeuronWriterService
-Modify `src/lib/sota/NeuronWriterService.ts` to:
-- Use Supabase client's `functions.invoke()` method (preferred)
-- Fall back to direct URL construction if needed
-- Remove browser-side direct API attempts (they will always fail due to CORS)
-
-### Step 6: Update SetupConfig Component
-Update the UI to:
-- Show proper connection status
-- Auto-fetch projects when API key is entered
-- Display helpful error messages if Supabase is not connected
-
----
+This should already be configured from the secrets you added earlier.
 
 ## Technical Details
 
-### File Changes
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `supabase/config.toml` | Create | Register edge functions with JWT disabled |
-| `src/integrations/supabase/client.ts` | Create | Supabase client for edge function calls |
-| `supabase/functions/neuronwriter-proxy/index.ts` | Update | Enhance logging and CORS headers |
-| `src/lib/sota/NeuronWriterService.ts` | Update | Use Supabase client for proxy calls |
-| `src/components/optimizer/steps/SetupConfig.tsx` | Update | Better UX for connection status |
-
-### New Supabase Client Code
-```typescript
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-export const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
-
-export const isSupabaseConfigured = () => !!supabase;
-```
-
-### Updated NeuronWriterService Proxy Logic
-```typescript
-private async makeProxyRequest<T>(endpoint: string, method: string, body?: Record<string, unknown>) {
-  // Use Supabase functions.invoke (preferred method)
-  if (supabase) {
-    const { data, error } = await supabase.functions.invoke('neuronwriter-proxy', {
-      body: { endpoint, method, apiKey: this.apiKey, body }
-    });
-    
-    if (error) throw error;
-    return { success: true, data: data?.data as T };
-  }
-  
-  // Fallback to direct URL fetch (for production deployments)
-  // ...
-}
-```
-
----
-
-## Dependencies
-- `@supabase/supabase-js` package (need to add to package.json)
+| Item | Current Value | New Value |
+|------|---------------|-----------|
+| Function name in code | `neuronwriter-proxy` | `hyper-worker` |
+| Your Supabase URL | - | `https://ousxeycrhvuwaejhpqgv.supabase.co` |
+| Function endpoint | - | `https://ousxeycrhvuwaejhpqgv.supabase.co/functions/v1/hyper-worker` |
 
 ## After Implementation
-Once Lovable Cloud is enabled and the changes are deployed:
-1. Edge functions will be automatically deployed
-2. NeuronWriter API calls will route through the server-side proxy
-3. CORS issues will be completely resolved
-4. Projects will auto-load when API key is entered
-
----
-
-## Testing Checklist
-- [x] Enable Lovable Cloud connection ← **USER MUST DO THIS**
-- [ ] Verify edge function deploys successfully  
-- [ ] Enter NeuronWriter API key in Setup
-- [ ] Confirm projects dropdown populates
-- [ ] Select a project and verify it saves to config
-
-## Implementation Status ✅
-
-All code changes have been implemented:
-1. ✅ Created `supabase/config.toml` with proper function registration
-2. ✅ Created `src/integrations/supabase/client.ts` for Supabase client
-3. ✅ Updated `supabase/functions/neuronwriter-proxy/index.ts` with enhanced CORS headers
-4. ✅ Rewrote `src/lib/sota/NeuronWriterService.ts` to use Supabase functions.invoke()
-5. ✅ Added `@supabase/supabase-js` dependency
-
-**NEXT STEP**: User must enable Lovable Cloud to provision Supabase backend and deploy edge functions.
+1. Test the NeuronWriter integration by entering your API key
+2. Verify projects load correctly
+3. The CORS errors should be resolved since calls now route through your Supabase edge function
