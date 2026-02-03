@@ -100,7 +100,8 @@ export function ContentStrategy() {
 
   // ✅ SOTA Enterprise-Grade: Multi-strategy sitemap fetcher with intelligent fallbacks
   // Notes:
-  // - In Lovable preview, Cloudflare Pages Functions + Vite middleware are not available.
+  // - In Cloudflare Pages, prefer same-origin /api/fetch-sitemap to avoid CORS.
+  // - In Lovable preview, /api/fetch-sitemap may 404; we fall back to other strategies.
   // - WordPress sitemaps can be large/slow to generate; timeouts must be realistic.
   const fetchSitemapText = async (targetUrl: string, externalSignal?: AbortSignal): Promise<string> => {
     const trimmed = targetUrl.trim();
@@ -144,6 +145,45 @@ export function ContentStrategy() {
         if (signal) signal.removeEventListener("abort", onAbort);
       }
     };
+
+    // Strategy 0: Same-origin Cloudflare Pages function proxy (/api/fetch-sitemap)
+    // - Works on Cloudflare Pages deployments (no CORS issues)
+    // - In local dev, Vite middleware provides parity
+    // - In Lovable preview, this may not exist (404), so we treat failures as soft and continue.
+    try {
+      const proxyUrl = new URL("/api/fetch-sitemap", window.location.origin);
+      proxyUrl.searchParams.set("url", trimmed);
+
+      console.log("[Sitemap] Strategy 0: Same-origin /api/fetch-sitemap proxy", {
+        url: proxyUrl.toString(),
+      });
+
+      const response = await fetchWithTimeout(
+        proxyUrl.toString(),
+        {
+          method: "GET",
+          headers: {
+            "Accept": "application/xml, text/xml, text/html, */*",
+          },
+        },
+        // Match (or slightly exceed) the Pages function's own upstream timeout.
+        95000,
+        externalSignal
+      );
+
+      if (response.ok) {
+        const text = await response.text();
+        if (isLikelySitemapXml(text)) return text;
+        errors.push("pagesProxy: unexpected content");
+      } else {
+        // If the route doesn't exist in this environment (e.g. preview), it will likely be 404.
+        errors.push(`pagesProxy: HTTP ${response.status}`);
+      }
+    } catch (e) {
+      const msg = normalizeTimeoutError(e, "pagesProxy");
+      errors.push(msg);
+      console.log("[Sitemap] /api/fetch-sitemap proxy failed:", msg);
+    }
 
     // Strategy 1: Supabase edge function (preferred: server-side fetch avoids CORS and sets UA headers)
     // Use GET so the edge function can return raw XML directly (no JSON parse + smaller overhead).
@@ -331,7 +371,7 @@ export function ContentStrategy() {
           return `https://${t}`;
         };
         const primary = normalize(input);
-        const out = [primary];
+        const out: string[] = [];
         try {
           const url = new URL(primary);
           const origin = url.origin;
@@ -340,10 +380,15 @@ export function ContentStrategy() {
             `${origin}/wp-sitemap.xml`,
             `${origin}/sitemap.xml`,
           ];
+          // ✅ Prefer fast index entrypoints first; child sitemaps like post-sitemap.xml can be huge/slow.
           for (const c of common) if (!out.includes(c)) out.push(c);
         } catch {
           // If URL parsing fails, just keep the original input.
         }
+
+        // Always include the user's exact input as a fallback (last).
+        if (primary && !out.includes(primary)) out.push(primary);
+
         return out;
       })();
 
