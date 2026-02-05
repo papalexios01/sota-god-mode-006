@@ -257,8 +257,8 @@ export function GodModeDashboard() {
         <GodModeConfigPanel onClose={() => setShowConfig(false)} />
       )}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* Enterprise Stats Grid */}
+      <div className="grid grid-cols-5 gap-4">
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
@@ -268,7 +268,7 @@ export function GodModeDashboard() {
               <div className="text-2xl font-bold text-foreground">
                 {state.stats.totalProcessed}
               </div>
-              <div className="text-sm text-muted-foreground">Total Processed</div>
+              <div className="text-sm text-muted-foreground">Processed</div>
             </div>
           </div>
         </div>
@@ -282,7 +282,7 @@ export function GodModeDashboard() {
               <div className="text-2xl font-bold text-foreground">
                 {state.stats.successCount}
               </div>
-              <div className="text-sm text-muted-foreground">Successful</div>
+              <div className="text-sm text-muted-foreground">Success</div>
             </div>
           </div>
         </div>
@@ -303,18 +303,58 @@ export function GodModeDashboard() {
 
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-purple-400" />
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              state.stats.avgQualityScore >= 90 ? 'bg-emerald-500/20' : 
+              state.stats.avgQualityScore >= 80 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+            }`}>
+              <TrendingUp className={`w-5 h-5 ${
+                state.stats.avgQualityScore >= 90 ? 'text-emerald-400' : 
+                state.stats.avgQualityScore >= 80 ? 'text-yellow-400' : 'text-red-400'
+              }`} />
             </div>
             <div>
-              <div className="text-2xl font-bold text-foreground">
+              <div className={`text-2xl font-bold ${
+                state.stats.avgQualityScore >= 90 ? 'text-emerald-400' : 
+                state.stats.avgQualityScore >= 80 ? 'text-yellow-400' : 'text-foreground'
+              }`}>
                 {state.stats.avgQualityScore.toFixed(0)}%
               </div>
               <div className="text-sm text-muted-foreground">Avg Quality</div>
             </div>
           </div>
         </div>
+
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-foreground">
+                {state.stats.totalWordsGenerated.toLocaleString()}
+              </div>
+              <div className="text-sm text-muted-foreground">Words</div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Enterprise Quality Badge (when 90%+ achieved) */}
+      {state.stats.avgQualityScore >= 90 && state.stats.totalProcessed > 0 && (
+        <div className="bg-gradient-to-r from-emerald-500/20 via-teal-500/15 to-emerald-500/10 border border-emerald-500/40 rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-500/30 rounded-xl flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-emerald-300">SOTA Quality Achieved</h3>
+              <p className="text-sm text-emerald-400/80">
+                Averaging {state.stats.avgQualityScore.toFixed(1)}% quality across {state.stats.totalProcessed} articles - Enterprise-grade performance
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Current Processing */}
       {state.currentUrl && (

@@ -1,18 +1,38 @@
 /**
- * God Mode 2.0 - Real-time Activity Feed
+ * God Mode 2.0 - SOTA Enterprise Activity Feed
  * 
- * Displays a live log of all engine activities with
- * color-coded messages and expandable details.
+ * State-of-the-art live activity monitoring featuring:
+ * - Real-time color-coded activity streaming
+ * - Enterprise-grade logging with timestamps
+ * - Activity type filtering (info/success/warning/error)
+ * - Expandable details with full context
+ * - Performance metrics integration
  */
 
+import { useState } from 'react';
 import { useOptimizerStore } from '@/lib/store';
 import { useGodModeEngine } from '@/hooks/useGodModeEngine';
-import { Activity, CheckCircle2, AlertTriangle, XCircle, Info, Trash2 } from 'lucide-react';
+import { Activity, CheckCircle2, AlertTriangle, XCircle, Info, Trash2, Filter, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type ActivityFilter = 'all' | 'success' | 'warning' | 'error' | 'info';
 
 export function GodModeActivityFeed() {
   const { state, clearActivityLog } = useGodModeEngine();
-  const activities = state.activityLog.slice().reverse().slice(0, 50);
+  const [filter, setFilter] = useState<ActivityFilter>('all');
+  
+  const allActivities = state.activityLog.slice().reverse().slice(0, 100);
+  const activities = filter === 'all' 
+    ? allActivities.slice(0, 50)
+    : allActivities.filter(a => a.type === filter).slice(0, 50);
+    
+  // Calculate activity stats
+  const activityStats = {
+    total: allActivities.length,
+    success: allActivities.filter(a => a.type === 'success').length,
+    warning: allActivities.filter(a => a.type === 'warning').length,
+    error: allActivities.filter(a => a.type === 'error').length,
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -36,17 +56,58 @@ export function GodModeActivityFeed() {
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h3 className="font-semibold text-foreground flex items-center gap-2">
           <Activity className="w-5 h-5 text-primary" />
-          Live Activity Feed
+          Enterprise Activity Log
+          <span className="text-xs text-muted-foreground font-normal">
+            ({activityStats.total} events)
+          </span>
         </h3>
-        {activities.length > 0 && (
-          <button
-            onClick={clearActivityLog}
-            className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-muted/50 transition-colors"
-            title="Clear activity log"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Filter buttons */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setFilter('all')}
+              className={cn(
+                "px-2 py-1 text-xs rounded transition-colors",
+                filter === 'all' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:bg-muted'
+              )}
+            >
+              All
+            </button>
+            {activityStats.error > 0 && (
+              <button
+                onClick={() => setFilter('error')}
+                className={cn(
+                  "px-2 py-1 text-xs rounded transition-colors flex items-center gap-1",
+                  filter === 'error' ? 'bg-red-500/20 text-red-400' : 'text-muted-foreground hover:bg-muted'
+                )}
+              >
+                <XCircle className="w-3 h-3" />
+                {activityStats.error}
+              </button>
+            )}
+            {activityStats.warning > 0 && (
+              <button
+                onClick={() => setFilter('warning')}
+                className={cn(
+                  "px-2 py-1 text-xs rounded transition-colors flex items-center gap-1",
+                  filter === 'warning' ? 'bg-yellow-500/20 text-yellow-400' : 'text-muted-foreground hover:bg-muted'
+                )}
+              >
+                <AlertTriangle className="w-3 h-3" />
+                {activityStats.warning}
+              </button>
+            )}
+          </div>
+          {allActivities.length > 0 && (
+            <button
+              onClick={clearActivityLog}
+              className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-muted/50 transition-colors"
+              title="Clear activity log"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">

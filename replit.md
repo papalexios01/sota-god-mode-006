@@ -52,6 +52,17 @@ npm run build
 The built files are output to the `dist` directory.
 
 ## Recent Changes
+- February 5, 2026: **SOTA Enterprise Upgrade - God Mode 2.0 & Priority Only Mode**
+  - Added enterprise-grade circuit breaker pattern for fault tolerance
+  - Implemented exponential backoff retry with jitter for API resilience
+  - Added multi-pass quality assurance (up to 3 passes for 90%+ scores)
+  - Enhanced Priority Only Mode with detailed pre-flight checks
+  - Added E-E-A-T signal detection (citations, author info, first-hand experience)
+  - Added readability analysis with Flesch-Kincaid grade level
+  - Enhanced activity feed with filtering and enterprise logging
+  - Added quality trend tracking and processing time analysis
+- February 5, 2026: **WordPress Formatting Fix** - Markdown-to-HTML converter prevents ## and ### symbols in published posts
+- February 5, 2026: **NeuronWriter UI Enhancement** - Shows all extended terms, named entities, and H2/H3 heading suggestions
 - February 5, 2026: **Major Migration** - Migrated from Supabase to Express + PostgreSQL + Drizzle ORM
   - Replaced all Supabase Edge Functions with Express API routes
   - Database now uses Neon PostgreSQL with Drizzle ORM
