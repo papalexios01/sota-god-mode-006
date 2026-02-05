@@ -206,11 +206,23 @@ export class NeuronWriterService {
         return { success: false, error: error.message };
       }
 
-      if (!data?.success) {
-        return { success: false, error: data?.error || 'Unknown proxy error' };
+      // IMPORTANT: Support both response formats:
+      // 1) Wrapped proxy response: { success: boolean; data: T; error?: string }
+      // 2) Raw payload response: T
+      // Some deployed proxy versions return raw JSON directly.
+      if (data == null) {
+        return { success: false, error: 'Empty response from proxy' };
       }
 
-      return { success: true, data: data.data as T };
+      if (typeof data === 'object' && data !== null && 'success' in (data as any)) {
+        const wrapped = data as any;
+        if (!wrapped.success) {
+          return { success: false, error: wrapped.error || 'Unknown proxy error' };
+        }
+        return { success: true, data: wrapped.data as T };
+      }
+
+      return { success: true, data: data as T };
     } catch (error) {
       console.error('[NeuronWriter] Supabase invoke error:', error);
       return { 
@@ -268,11 +280,15 @@ export class NeuronWriterService {
         return { success: false, error: `Invalid JSON from proxy: ${text.substring(0, 100)}` };
       }
 
-      if (!result.success) {
-        return { success: false, error: result.error || `Proxy error: ${result.status}` };
+      // Support both wrapped and raw payload responses.
+      if (result && typeof result === 'object' && 'success' in result) {
+        if (!result.success) {
+          return { success: false, error: result.error || `Proxy error: ${result.status}` };
+        }
+        return { success: true, data: result.data as T };
       }
 
-      return { success: true, data: result.data as T };
+      return { success: true, data: result as T };
     } catch (error) {
       return { 
         success: false, 
@@ -315,12 +331,16 @@ export class NeuronWriterService {
       }
 
       const result = await response.json();
-      
-      if (!result.success) {
-        return { success: false, error: result.error || 'Cloudflare proxy error' };
+
+      // Support both wrapped and raw payload responses.
+      if (result && typeof result === 'object' && 'success' in result) {
+        if (!result.success) {
+          return { success: false, error: result.error || 'Cloudflare proxy error' };
+        }
+        return { success: true, data: result.data as T };
       }
 
-      return { success: true, data: result.data as T };
+      return { success: true, data: result as T };
     } catch (error) {
       return { 
         success: false, 
