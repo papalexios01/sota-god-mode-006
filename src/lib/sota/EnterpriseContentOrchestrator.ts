@@ -621,94 +621,99 @@ Output ONLY the title, nothing else.`;
 • Add credentials signals: "According to Dr. [Name], a [credential] at [institution]..."
 • Cite industry reports: "[Company] 2024 State of [Industry] Report shows..."
 
-📐 MANDATORY HTML STRUCTURE (USE THESE ULTRA-PREMIUM ELEMENTS):
+📐 MANDATORY HTML STRUCTURE (WORDPRESS-COMPATIBLE ELEMENTS):
+
+⚠️ CRITICAL: Use ONLY these theme-neutral HTML elements that work on ANY WordPress theme (light or dark):
+- All text MUST use inherit or high-contrast colors that work on any background
+- Boxes use subtle borders and backgrounds that work universally
+- NO dark theme-specific colors
 
 1. BLUF HOOK (first 50 words): 
 Start with the ANSWER or a bold statement. No "welcome to" garbage. Give them the gold immediately.
 
-2. KEY TAKEAWAYS BOX (right after hook) - GLASSMORPHIC DESIGN:
-<div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 24px; padding: 32px 36px; margin: 40px 0; box-shadow: 0 8px 32px rgba(16, 185, 129, 0.15), 0 0 0 1px rgba(16, 185, 129, 0.2), inset 0 1px 1px rgba(255,255,255,0.1);">
-  <h3 style="color: #10b981; margin: 0 0 20px 0; font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 12px; text-shadow: 0 0 30px rgba(16, 185, 129, 0.5);">🎯 The Bottom Line (TL;DR)</h3>
-  <ul style="color: #e5e7eb; margin: 0; padding-left: 28px; font-size: 17px; line-height: 2;">
-    <li style="margin-bottom: 12px;"><strong style="color: #34d399;">Key insight:</strong> Actionable point here</li>
-    <li style="margin-bottom: 12px;"><strong style="color: #34d399;">Key insight:</strong> Actionable point here</li>
-    <li style="margin-bottom: 0;"><strong style="color: #34d399;">Key insight:</strong> Actionable point here</li>
+2. KEY TAKEAWAYS BOX (right after hook):
+<div style="background: #f0fdf4; border: 2px solid #10b981; border-radius: 12px; padding: 24px 28px; margin: 32px 0;">
+  <h3 style="color: #047857; margin: 0 0 16px 0; font-size: 22px; font-weight: 700;">🎯 The Bottom Line (TL;DR)</h3>
+  <ul style="color: #1f2937; margin: 0; padding-left: 24px; font-size: 16px; line-height: 1.8;">
+    <li style="margin-bottom: 8px;"><strong>Key insight:</strong> Actionable point here</li>
+    <li style="margin-bottom: 8px;"><strong>Key insight:</strong> Actionable point here</li>
+    <li style="margin-bottom: 0;"><strong>Key insight:</strong> Actionable point here</li>
   </ul>
 </div>
 
-3. PRO TIP BOXES (4-6 throughout) - NEUMORPHIC STYLE:
-<div style="background: linear-gradient(145deg, #1e40af, #1e3a8a); border-left: 6px solid #60a5fa; padding: 24px 28px; margin: 32px 0; border-radius: 0 20px 20px 0; box-shadow: 8px 8px 24px rgba(30, 64, 175, 0.3), -4px -4px 16px rgba(96, 165, 250, 0.1), inset 0 1px 1px rgba(255,255,255,0.05);">
-  <strong style="color: #93c5fd; font-size: 16px; display: flex; align-items: center; gap: 8px;">💡 Pro Tip</strong>
-  <p style="color: #dbeafe; font-size: 16px; margin: 10px 0 0 0; line-height: 1.7;">Your actionable insider knowledge here — the kind of tip that makes people screenshot and share.</p>
+3. PRO TIP BOXES (4-6 throughout):
+<div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px 24px; margin: 28px 0; border-radius: 0 8px 8px 0;">
+  <strong style="color: #1e40af; font-size: 16px; display: block; margin-bottom: 8px;">💡 Pro Tip</strong>
+  <p style="color: #1f2937; font-size: 16px; margin: 0; line-height: 1.7;">Your actionable insider knowledge here.</p>
 </div>
 
-4. WARNING BOXES (when relevant) - HIGH-CONTRAST ALERT:
-<div style="background: linear-gradient(145deg, #b91c1c, #7f1d1d); border-left: 6px solid #f87171; padding: 24px 28px; margin: 32px 0; border-radius: 0 20px 20px 0; box-shadow: 8px 8px 24px rgba(185, 28, 28, 0.3), -4px -4px 16px rgba(248, 113, 113, 0.1), inset 0 1px 1px rgba(255,255,255,0.05);">
-  <strong style="color: #fecaca; font-size: 16px; display: flex; align-items: center; gap: 8px;">⚠️ Warning</strong>
-  <p style="color: #fee2e2; font-size: 16px; margin: 10px 0 0 0; line-height: 1.7;">Critical warning that saves them from a costly mistake.</p>
+4. WARNING BOXES (when relevant):
+<div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 20px 24px; margin: 28px 0; border-radius: 0 8px 8px 0;">
+  <strong style="color: #b91c1c; font-size: 16px; display: block; margin-bottom: 8px;">⚠️ Warning</strong>
+  <p style="color: #1f2937; font-size: 16px; margin: 0; line-height: 1.7;">Critical warning that saves them from a costly mistake.</p>
 </div>
 
-5. DATA COMPARISON TABLE (at least 1) - PREMIUM DARK THEME:
-<div style="margin: 40px 0; border-radius: 20px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);">
-  <table style="width: 100%; border-collapse: collapse; background: #0a0a0f;">
+5. DATA COMPARISON TABLE (at least 1):
+<div style="margin: 32px 0; overflow-x: auto;">
+  <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb;">
     <thead>
-      <tr style="background: linear-gradient(135deg, #1f2937 0%, #111827 100%);">
-        <th style="padding: 20px 24px; text-align: left; color: #f9fafb; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #374151;">Column 1</th>
-        <th style="padding: 20px 24px; text-align: left; color: #f9fafb; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #374151;">Column 2</th>
-        <th style="padding: 20px 24px; text-align: left; color: #f9fafb; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #374151;">Column 3</th>
+      <tr style="background: #f9fafb;">
+        <th style="padding: 16px 20px; text-align: left; color: #1f2937; font-weight: 700; border-bottom: 2px solid #10b981;">Column 1</th>
+        <th style="padding: 16px 20px; text-align: left; color: #1f2937; font-weight: 700; border-bottom: 2px solid #10b981;">Column 2</th>
+        <th style="padding: 16px 20px; text-align: left; color: #1f2937; font-weight: 700; border-bottom: 2px solid #10b981;">Column 3</th>
       </tr>
     </thead>
     <tbody>
-      <tr style="transition: background 0.2s;">
-        <td style="padding: 18px 24px; color: #e5e7eb; border-bottom: 1px solid #1f2937; font-size: 15px;">Data</td>
-        <td style="padding: 18px 24px; color: #e5e7eb; border-bottom: 1px solid #1f2937; font-size: 15px;">Data</td>
-        <td style="padding: 18px 24px; color: #10b981; border-bottom: 1px solid #1f2937; font-size: 15px; font-weight: 600;">Highlight</td>
+      <tr>
+        <td style="padding: 14px 20px; color: #374151; border-bottom: 1px solid #e5e7eb;">Data</td>
+        <td style="padding: 14px 20px; color: #374151; border-bottom: 1px solid #e5e7eb;">Data</td>
+        <td style="padding: 14px 20px; color: #059669; border-bottom: 1px solid #e5e7eb; font-weight: 600;">Highlight</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-6. NUMBERED STEP BOXES (for how-to sections) - MODERN CARD STYLE:
-<div style="background: linear-gradient(160deg, #1e293b 0%, #0f172a 100%); border-radius: 20px; padding: 32px; margin: 32px 0; border: 1px solid rgba(71, 85, 105, 0.5); box-shadow: 0 20px 40px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05);">
-  <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 16px;">
-    <span style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);">1</span>
-    <strong style="color: #f1f5f9; font-size: 20px; font-weight: 700;">Step Title Here</strong>
+6. NUMBERED STEP BOXES (for how-to sections):
+<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin: 28px 0;">
+  <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 12px;">
+    <span style="background: #10b981; color: white; width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px;">1</span>
+    <strong style="color: #1f2937; font-size: 18px; font-weight: 700;">Step Title Here</strong>
   </div>
-  <p style="color: #94a3b8; margin: 0; padding-left: 62px; font-size: 16px; line-height: 1.8;">Step description with actionable details that they can implement immediately...</p>
+  <p style="color: #4b5563; margin: 0; padding-left: 52px; font-size: 16px; line-height: 1.7;">Step description with actionable details.</p>
 </div>
 
-7. QUOTE/CALLOUT BOXES - EDITORIAL STYLE:
-<blockquote style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 100%); border-left: 5px solid #10b981; padding: 28px 32px; margin: 40px 0; border-radius: 0 20px 20px 0; position: relative;">
-  <p style="color: #e5e7eb; margin: 0; font-size: 20px; line-height: 1.7; font-style: italic; font-weight: 500;">"Powerful quote that reinforces your point and makes them want to share it..."</p>
-  <footer style="color: #6b7280; margin-top: 16px; font-size: 15px; font-style: normal; font-weight: 600;">— Source Name, Title/Company</footer>
+7. QUOTE/CALLOUT BOXES:
+<blockquote style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 24px 28px; margin: 32px 0; border-radius: 0 8px 8px 0;">
+  <p style="color: #1f2937; margin: 0; font-size: 18px; line-height: 1.7; font-style: italic;">"Powerful quote that reinforces your point..."</p>
+  <footer style="color: #6b7280; margin-top: 12px; font-size: 14px; font-style: normal; font-weight: 600;">— Source Name, Title/Company</footer>
 </blockquote>
 
-8. STAT HIGHLIGHT BOX - DATA VISUALIZATION:
-<div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 20px; padding: 32px; margin: 36px 0; display: flex; align-items: center; gap: 24px; border: 1px solid rgba(16, 185, 129, 0.3); box-shadow: 0 15px 40px rgba(0,0,0,0.3);">
-  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 16px; padding: 20px 24px; text-align: center; min-width: 120px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);">
-    <span style="color: white; font-size: 36px; font-weight: 800; display: block;">87%</span>
-    <span style="color: rgba(255,255,255,0.8); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Metric</span>
+8. STAT HIGHLIGHT BOX:
+<div style="background: #f8fafc; border: 2px solid #10b981; border-radius: 12px; padding: 24px; margin: 32px 0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+  <div style="background: #10b981; border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 100px;">
+    <span style="color: white; font-size: 32px; font-weight: 800; display: block;">87%</span>
+    <span style="color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase;">Metric</span>
   </div>
-  <p style="color: #e5e7eb; margin: 0; font-size: 17px; line-height: 1.7;">Explanation of what this stat means and why it matters to them...</p>
+  <p style="color: #1f2937; margin: 0; font-size: 16px; line-height: 1.7; flex: 1; min-width: 200px;">Explanation of what this stat means and why it matters.</p>
 </div>
 
-9. FAQ SECTION (6-8 questions at end) - ACCORDION STYLE:
-<div style="background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%); border: 1px solid #334155; border-radius: 20px; margin: 20px 0; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-  <h4 style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); margin: 0; padding: 22px 28px; color: #f1f5f9; font-size: 17px; font-weight: 700; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 12px;">
-    <span style="color: #10b981; font-size: 20px;">❓</span> Question here?
+9. FAQ SECTION (6-8 questions at end):
+<div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; margin: 20px 0; overflow: hidden;">
+  <h4 style="background: #f3f4f6; margin: 0; padding: 18px 24px; color: #1f2937; font-size: 17px; font-weight: 700; border-bottom: 1px solid #e5e7eb;">
+    ❓ Question here?
   </h4>
-  <div style="padding: 24px 28px;">
-    <p style="color: #94a3b8; margin: 0; font-size: 16px; line-height: 1.8;">Direct, valuable answer without fluff. Give them exactly what they need to know.</p>
+  <div style="padding: 20px 24px;">
+    <p style="color: #4b5563; margin: 0; font-size: 16px; line-height: 1.7;">Direct, valuable answer without fluff.</p>
   </div>
 </div>
 
-10. CTA BOX (at the end) - HIGH-CONVERSION DESIGN:
-<div style="background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%); border-radius: 24px; padding: 40px 44px; margin: 48px 0; text-align: center; box-shadow: 0 20px 50px rgba(16, 185, 129, 0.35), 0 0 0 1px rgba(255,255,255,0.1), inset 0 1px 2px rgba(255,255,255,0.2);">
-  <h3 style="color: white; margin: 0 0 16px 0; font-size: 28px; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">🚀 Ready to Take Action?</h3>
-  <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 18px; line-height: 1.7;">Strong call-to-action that tells them exactly what to do next. Make it specific and time-bound.</p>
+10. CTA BOX (at the end):
+<div style="background: #10b981; border-radius: 12px; padding: 32px; margin: 40px 0; text-align: center;">
+  <h3 style="color: white; margin: 0 0 12px 0; font-size: 24px; font-weight: 800;">🚀 Ready to Take Action?</h3>
+  <p style="color: rgba(255,255,255,0.95); margin: 0; font-size: 17px; line-height: 1.6;">Strong call-to-action that tells them exactly what to do next.</p>
 </div>
 
-🎯 OUTPUT: Pure HTML only. No markdown. Proper h2/h3 hierarchy. Every single paragraph MUST deliver VALUE. Make them feel like they're getting $10,000 worth of consulting for free.`;
+🎯 OUTPUT: Pure HTML only. No markdown. Proper h2/h3 hierarchy. Every paragraph MUST deliver VALUE. All text must be readable on light backgrounds (use dark text colors like #1f2937, #374151, #4b5563).`;
 
     const prompt = `Write a ${targetWordCount}+ word article about "${keyword}".
 

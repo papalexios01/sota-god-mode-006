@@ -22,6 +22,8 @@ export function useWordPressPublish() {
       slug?: string;
       metaDescription?: string;
       seoTitle?: string;
+      sourceUrl?: string;
+      existingPostId?: number;
     }
   ): Promise<PublishResult> => {
     setIsPublishing(true);
@@ -32,7 +34,7 @@ export function useWordPressPublish() {
         throw new Error('WordPress not configured. Add WordPress URL, username, and application password in Setup.');
       }
 
-      const safeSlug = options?.slug ? options.slug.replace(/^\/+/, '') : undefined;
+      const safeSlug = options?.slug ? options.slug.replace(/^\/+/, '').split('/').pop() : undefined;
 
       const body = {
         wpUrl: config.wpUrl,
@@ -45,6 +47,8 @@ export function useWordPressPublish() {
         slug: safeSlug,
         metaDescription: options?.metaDescription,
         seoTitle: options?.seoTitle,
+        sourceUrl: options?.sourceUrl,
+        existingPostId: options?.existingPostId,
       };
 
       const response = await fetch('/api/wordpress-publish', {

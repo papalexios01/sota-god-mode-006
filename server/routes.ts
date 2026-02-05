@@ -278,6 +278,8 @@ export function registerRoutes(app: Express): void {
         slug,
         metaDescription,
         seoTitle,
+        sourceUrl,
+        existingPostId,
       } = req.body;
 
       if (!wpUrl || !username || !appPassword || !title || !content) {
@@ -296,6 +298,53 @@ export function registerRoutes(app: Express): void {
       const authString = `${username}:${appPassword}`;
       const authBase64 = Buffer.from(authString).toString("base64");
 
+      const authHeaders = {
+        Authorization: `Basic ${authBase64}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      };
+
+      let targetPostId: number | null = existingPostId ? parseInt(existingPostId, 10) : null;
+
+      if (!targetPostId && slug) {
+        try {
+          const cleanSlug = slug.replace(/^\/+|\/+$/g, "").split("/").pop() || slug;
+          console.log(`[WordPress] Searching for existing post with slug: ${cleanSlug}`);
+          const searchUrl = `${apiUrl}?slug=${encodeURIComponent(cleanSlug)}&status=any`;
+          const searchRes = await fetch(searchUrl, { headers: authHeaders });
+          if (searchRes.ok) {
+            const posts = await searchRes.json();
+            if (Array.isArray(posts) && posts.length > 0) {
+              targetPostId = posts[0].id;
+              console.log(`[WordPress] Found existing post ID: ${targetPostId}`);
+            }
+          }
+        } catch (err) {
+          console.log(`[WordPress] Could not search for existing post:`, err);
+        }
+      }
+
+      if (!targetPostId && sourceUrl) {
+        try {
+          const pathMatch = sourceUrl.match(/\/([^\/]+)\/?$/);
+          if (pathMatch) {
+            const sourceSlug = pathMatch[1].replace(/\/$/, "");
+            console.log(`[WordPress] Searching for existing post with source slug: ${sourceSlug}`);
+            const searchUrl = `${apiUrl}?slug=${encodeURIComponent(sourceSlug)}&status=any`;
+            const searchRes = await fetch(searchUrl, { headers: authHeaders });
+            if (searchRes.ok) {
+              const posts = await searchRes.json();
+              if (Array.isArray(posts) && posts.length > 0) {
+                targetPostId = posts[0].id;
+                console.log(`[WordPress] Found existing post ID from sourceUrl: ${targetPostId}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.log(`[WordPress] Could not search by sourceUrl:`, err);
+        }
+      }
+
       const postData: Record<string, unknown> = {
         title,
         content,
@@ -303,7 +352,10 @@ export function registerRoutes(app: Express): void {
       };
 
       if (excerpt) postData.excerpt = excerpt;
-      if (slug) postData.slug = slug;
+      if (slug) {
+        const cleanSlug = slug.replace(/^\/+|\/+$/g, "").split("/").pop() || slug;
+        postData.slug = cleanSlug;
+      }
       if (categories && categories.length > 0) postData.categories = categories;
       if (tags && tags.length > 0) postData.tags = tags;
 
@@ -318,13 +370,14 @@ export function registerRoutes(app: Express): void {
         };
       }
 
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${authBase64}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+      const targetUrl = targetPostId ? `${apiUrl}/${targetPostId}` : apiUrl;
+      const method = targetPostId ? "PUT" : "POST";
+
+      console.log(`[WordPress] ${method} to ${targetUrl}`);
+
+      const response = await fetch(targetUrl, {
+        method,
+        headers: authHeaders,
         body: JSON.stringify(postData),
       });
 
@@ -357,6 +410,7 @@ export function registerRoutes(app: Express): void {
 
       res.json({
         success: true,
+        updated: !!targetPostId,
         post: {
           id: post.id,
           url: post.link,

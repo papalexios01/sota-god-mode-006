@@ -122,7 +122,8 @@ export function ContentViewerPanel({
         slug: effectivePublishSlug,
         metaDescription: generatedContent?.metaDescription,
         excerpt: generatedContent?.metaDescription,
-        seoTitle: effectiveSeoTitle, // Pass SEO-optimized title for Yoast/RankMath
+        seoTitle: effectiveSeoTitle,
+        sourceUrl: item.url,
       }
     );
 
