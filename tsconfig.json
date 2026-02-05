@@ -19,9 +19,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"],
+      "@shared/*": ["./shared/*"]
     },
     "resolveJsonModule": true,
     "skipLibCheck": true,
@@ -34,6 +33,8 @@
     "dist"
   ],
   "include": [
-    "src"
+    "src",
+    "shared",
+    "server"
   ]
 }

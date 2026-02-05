@@ -1,0 +1,489 @@
+import type { Express, Request, Response } from "express";
+import { db } from "./db";
+import { generatedBlogPosts } from "../shared/schema";
+import { eq, desc } from "drizzle-orm";
+
+const NEURON_API_BASE = "https://app.neuronwriter.com/neuron-api/0.5/writer";
+
+export function registerRoutes(app: Express): void {
+  app.get("/api/blog-posts", async (_req: Request, res: Response) => {
+    try {
+      const posts = await db
+        .select()
+        .from(generatedBlogPosts)
+        .orderBy(desc(generatedBlogPosts.generatedAt));
+
+      const store: Record<string, unknown> = {};
+      for (const row of posts) {
+        store[row.itemId] = {
+          id: row.id,
+          title: row.title,
+          seoTitle: row.seoTitle,
+          content: row.content,
+          metaDescription: row.metaDescription,
+          slug: row.slug,
+          primaryKeyword: row.primaryKeyword,
+          secondaryKeywords: row.secondaryKeywords || [],
+          wordCount: row.wordCount,
+          qualityScore: row.qualityScore || {
+            overall: 0,
+            readability: 0,
+            seo: 0,
+            eeat: 0,
+            uniqueness: 0,
+            factAccuracy: 0,
+          },
+          internalLinks: row.internalLinks || [],
+          schema: row.schema,
+          serpAnalysis: row.serpAnalysis,
+          neuronWriterQueryId: row.neuronwriterQueryId,
+          generatedAt: row.generatedAt?.toISOString(),
+          model: row.model,
+        };
+      }
+
+      res.json({ success: true, data: store });
+    } catch (error) {
+      console.error("[API] Load blog posts error:", error);
+      res.status(500).json({ success: false, error: "Failed to load blog posts" });
+    }
+  });
+
+  app.post("/api/blog-posts", async (req: Request, res: Response) => {
+    try {
+      const { itemId, content } = req.body;
+      if (!itemId || !content) {
+        return res.status(400).json({ success: false, error: "Missing itemId or content" });
+      }
+
+      await db
+        .insert(generatedBlogPosts)
+        .values({
+          id: content.id,
+          itemId,
+          title: content.title,
+          seoTitle: content.seoTitle,
+          content: content.content,
+          metaDescription: content.metaDescription,
+          slug: content.slug,
+          primaryKeyword: content.primaryKeyword,
+          secondaryKeywords: content.secondaryKeywords,
+          wordCount: content.wordCount,
+          qualityScore: content.qualityScore,
+          internalLinks: content.internalLinks,
+          schema: content.schema,
+          serpAnalysis: content.serpAnalysis,
+          neuronwriterQueryId: content.neuronWriterQueryId,
+          generatedAt: content.generatedAt ? new Date(content.generatedAt) : new Date(),
+          model: content.model,
+        })
+        .onConflictDoUpdate({
+          target: generatedBlogPosts.itemId,
+          set: {
+            title: content.title,
+            seoTitle: content.seoTitle,
+            content: content.content,
+            metaDescription: content.metaDescription,
+            slug: content.slug,
+            primaryKeyword: content.primaryKeyword,
+            secondaryKeywords: content.secondaryKeywords,
+            wordCount: content.wordCount,
+            qualityScore: content.qualityScore,
+            internalLinks: content.internalLinks,
+            schema: content.schema,
+            serpAnalysis: content.serpAnalysis,
+            neuronwriterQueryId: content.neuronWriterQueryId,
+            generatedAt: content.generatedAt ? new Date(content.generatedAt) : new Date(),
+            model: content.model,
+            updatedAt: new Date(),
+          },
+        });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[API] Save blog post error:", error);
+      res.status(500).json({ success: false, error: "Failed to save blog post" });
+    }
+  });
+
+  app.delete("/api/blog-posts/:itemId", async (req: Request, res: Response) => {
+    try {
+      const { itemId } = req.params;
+      await db.delete(generatedBlogPosts).where(eq(generatedBlogPosts.itemId, itemId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[API] Delete blog post error:", error);
+      res.status(500).json({ success: false, error: "Failed to delete blog post" });
+    }
+  });
+
+  app.post("/api/neuronwriter-proxy", async (req: Request, res: Response) => {
+    try {
+      const { endpoint, method = "POST", apiKey, body: requestBody } = req.body;
+      const apiKeyFromHeader = req.headers["x-neuronwriter-key"] as string;
+      const finalApiKey = apiKey || apiKeyFromHeader;
+
+      if (!endpoint || !finalApiKey) {
+        return res.status(400).json({ success: false, error: "Missing endpoint or apiKey" });
+      }
+
+      const cleanApiKey = finalApiKey.trim();
+      const url = `${NEURON_API_BASE}${endpoint}`;
+
+      let timeoutMs = 45000;
+      if (endpoint === "/list-projects" || endpoint === "/list-queries") {
+        timeoutMs = 20000;
+      } else if (endpoint === "/new-query") {
+        timeoutMs = 60000;
+      } else if (endpoint === "/get-query") {
+        timeoutMs = 30000;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const fetchOptions: RequestInit = {
+        method,
+        headers: {
+          "X-API-KEY": cleanApiKey,
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "User-Agent": "ContentOptimizer/1.0",
+        },
+        signal: controller.signal,
+      };
+
+      if (requestBody && (method === "POST" || method === "PUT")) {
+        fetchOptions.body = JSON.stringify(requestBody);
+      }
+
+      const response = await fetch(url, fetchOptions);
+      clearTimeout(timeoutId);
+
+      const responseText = await response.text();
+      let responseData: unknown;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = { raw: responseText };
+      }
+
+      res.json({
+        success: response.ok,
+        status: response.status,
+        data: responseData,
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const isTimeout = errorMessage.includes("abort");
+      res.status(isTimeout ? 408 : 500).json({
+        success: false,
+        error: isTimeout ? "Request timed out" : errorMessage,
+        type: isTimeout ? "timeout" : "network_error",
+      });
+    }
+  });
+
+  app.all("/api/fetch-sitemap", async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    try {
+      let targetUrl: string | null = null;
+
+      if (req.method === "GET") {
+        targetUrl = req.query.url as string;
+      } else if (req.method === "POST") {
+        targetUrl = req.body.url;
+      }
+
+      if (!targetUrl) {
+        return res.status(400).json({ error: "URL parameter is required" });
+      }
+
+      try {
+        new URL(targetUrl);
+      } catch {
+        return res.status(400).json({ error: "Invalid URL format" });
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+      const response = await fetch(targetUrl, {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+          "Accept": "application/xml, text/xml, text/html, */*",
+          "Accept-Encoding": "gzip, deflate",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+        signal: controller.signal,
+        redirect: "follow",
+      });
+
+      clearTimeout(timeoutId);
+      const elapsed = Date.now() - startTime;
+
+      if (!response.ok) {
+        return res.status(response.status).json({
+          error: `Failed to fetch: HTTP ${response.status}`,
+          status: response.status,
+          elapsed,
+        });
+      }
+
+      const content = await response.text();
+      const contentType = response.headers.get("content-type") || "text/plain";
+      const isXml = contentType.includes("xml") || content.trim().startsWith("<?xml") || content.includes("<urlset") || content.includes("<sitemapindex");
+
+      if (req.method === "GET" && isXml) {
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("X-Fetch-Time", `${elapsed}ms`);
+        return res.send(content);
+      }
+
+      res.json({
+        content,
+        contentType,
+        url: targetUrl,
+        size: content.length,
+        isXml,
+        elapsed,
+      });
+    } catch (error: unknown) {
+      const elapsed = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const isTimeout = errorMessage.includes("abort") || errorMessage.includes("timeout");
+      res.status(isTimeout ? 408 : 500).json({
+        error: isTimeout ? `Request timed out after ${Math.round(elapsed / 1000)}s` : errorMessage,
+        type: isTimeout ? "timeout" : "fetch_error",
+        elapsed,
+      });
+    }
+  });
+
+  app.post("/api/wordpress-publish", async (req: Request, res: Response) => {
+    try {
+      const {
+        wpUrl,
+        username,
+        appPassword,
+        title,
+        content,
+        excerpt,
+        status = "draft",
+        categories,
+        tags,
+        slug,
+        metaDescription,
+        seoTitle,
+      } = req.body;
+
+      if (!wpUrl || !username || !appPassword || !title || !content) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields: wpUrl, username, appPassword, title, content",
+        });
+      }
+
+      let baseUrl = wpUrl.trim().replace(/\/+$/, "");
+      if (!baseUrl.startsWith("http")) {
+        baseUrl = `https://${baseUrl}`;
+      }
+      const apiUrl = `${baseUrl}/wp-json/wp/v2/posts`;
+
+      const authString = `${username}:${appPassword}`;
+      const authBase64 = Buffer.from(authString).toString("base64");
+
+      const postData: Record<string, unknown> = {
+        title,
+        content,
+        status,
+      };
+
+      if (excerpt) postData.excerpt = excerpt;
+      if (slug) postData.slug = slug;
+      if (categories && categories.length > 0) postData.categories = categories;
+      if (tags && tags.length > 0) postData.tags = tags;
+
+      if (metaDescription || seoTitle) {
+        postData.meta = {
+          _yoast_wpseo_metadesc: metaDescription || "",
+          _yoast_wpseo_title: seoTitle || title,
+          rank_math_description: metaDescription || "",
+          rank_math_title: seoTitle || title,
+          _aioseo_description: metaDescription || "",
+          _aioseo_title: seoTitle || title,
+        };
+      }
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${authBase64}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(postData),
+      });
+
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        let errorMessage = `WordPress API error: ${response.status}`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorData.error || errorMessage;
+
+          if (response.status === 401) {
+            errorMessage = "Authentication failed. Check your username and application password.";
+          } else if (response.status === 403) {
+            errorMessage = "Permission denied. Ensure the user has publish capabilities.";
+          } else if (response.status === 404) {
+            errorMessage = "WordPress REST API not found. Ensure permalinks are enabled and REST API is accessible.";
+          }
+        } catch {}
+
+        return res.json({ success: false, error: errorMessage, status: response.status });
+      }
+
+      let post: { id: number; link: string; status: string; title?: { rendered: string }; slug: string };
+      try {
+        post = JSON.parse(responseText);
+      } catch {
+        return res.json({ success: false, error: "Invalid response from WordPress" });
+      }
+
+      res.json({
+        success: true,
+        post: {
+          id: post.id,
+          url: post.link,
+          status: post.status,
+          title: post.title?.rendered || title,
+          slug: post.slug,
+        },
+      });
+    } catch (error) {
+      console.error("[WordPress] Error:", error);
+      res.json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  app.post("/api/wp-discover", async (req: Request, res: Response) => {
+    try {
+      const siteUrl = req.body?.siteUrl;
+      if (!siteUrl || typeof siteUrl !== "string") {
+        return res.status(400).json({ success: false, error: "siteUrl is required" });
+      }
+
+      const normalizeOrigin = (input: string): string => {
+        const t = input.trim();
+        const withProto = t.startsWith("http://") || t.startsWith("https://") ? t : `https://${t}`;
+        const url = new URL(withProto);
+        return url.origin;
+      };
+
+      const origin = normalizeOrigin(siteUrl);
+      const perPage = Number(req.body?.perPage ?? 100);
+      const maxPages = Number(req.body?.maxPages ?? 250);
+      const maxUrls = Number(req.body?.maxUrls ?? 100000);
+      const includePages = req.body?.includePages !== false;
+
+      const fetchWpLinks = async (
+        origin: string,
+        endpoint: "posts" | "pages",
+        opts: { perPage: number; maxPages: number; maxUrls: number }
+      ): Promise<string[]> => {
+        const perPageClamped = Math.min(100, Math.max(1, opts.perPage));
+        const maxPagesClamped = Math.max(1, opts.maxPages);
+        const maxUrlsClamped = Math.max(1, opts.maxUrls);
+
+        const out = new Set<string>();
+        const mkUrl = (page: number) =>
+          `${origin}/wp-json/wp/v2/${endpoint}?per_page=${perPageClamped}&page=${page}&_fields=link`;
+
+        const fetchPage = async (page: number) => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+          try {
+            const res = await fetch(mkUrl(page), {
+              method: "GET",
+              headers: {
+                Accept: "application/json",
+                "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+              },
+              signal: controller.signal,
+            });
+            const json = await res.json().catch(() => null);
+            const totalPagesHeader = res.headers.get("x-wp-totalpages") || res.headers.get("X-WP-TotalPages");
+            const totalPages = totalPagesHeader ? Number(totalPagesHeader) : undefined;
+
+            if (!res.ok || !Array.isArray(json)) {
+              return { links: [] as string[], totalPages };
+            }
+
+            const links: string[] = [];
+            for (const item of json) {
+              const link = (item as Record<string, unknown>)?.link;
+              if (typeof link === "string" && link.startsWith("http")) links.push(link);
+            }
+            return { links, totalPages };
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        };
+
+        const first = await fetchPage(1);
+        for (const l of first.links) {
+          if (out.size >= maxUrlsClamped) break;
+          out.add(l);
+        }
+
+        const totalPages = first.totalPages;
+        const finalPage = totalPages ? Math.min(totalPages, maxPagesClamped) : maxPagesClamped;
+
+        const concurrency = 4;
+        let page = 2;
+        while (page <= finalPage && out.size < maxUrlsClamped) {
+          const batch = Array.from({ length: concurrency }, (_, i) => page + i).filter((p) => p <= finalPage);
+          page += batch.length;
+
+          const results = await Promise.all(batch.map((p) => fetchPage(p)));
+          for (const r of results) {
+            for (const l of r.links) {
+              if (out.size >= maxUrlsClamped) break;
+              out.add(l);
+            }
+            if (!totalPages && r.links.length === 0) {
+              page = finalPage + 1;
+              break;
+            }
+          }
+        }
+
+        return Array.from(out);
+      };
+
+      const urls = new Set<string>();
+
+      const postLinks = await fetchWpLinks(origin, "posts", { perPage, maxPages, maxUrls });
+      postLinks.forEach((u) => urls.add(u));
+
+      if (includePages && urls.size < maxUrls) {
+        const pageLinks = await fetchWpLinks(origin, "pages", { perPage, maxPages, maxUrls: maxUrls - urls.size });
+        pageLinks.forEach((u) => urls.add(u));
+      }
+
+      res.json({ success: true, urls: Array.from(urls) });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[wp-discover] Error:", msg);
+      res.status(500).json({ success: false, error: msg });
+    }
+  });
+}
