@@ -574,47 +574,69 @@ export class NeuronWriterService {
     const required = terms.filter(t => t.type === 'required');
     const recommended = terms.filter(t => t.type === 'recommended');
     
+    // Combine basic + extended for comprehensive keyword coverage
+    const allTerms = [...terms, ...(analysis?.termsExtended || [])];
+    const topTermsByUsage = allTerms
+      .sort((a, b) => (b.usage_pc || 0) - (a.usage_pc || 0))
+      .slice(0, 50);
+    
     let prompt = `
-NEURONWRITER SEO OPTIMIZATION - TARGET: 90%+ CONTENT SCORE
+🔴 NEURONWRITER KEYWORD OPTIMIZATION - TARGET: 90%+ CONTENT SCORE 🔴
 
-### REQUIRED KEYWORDS (MUST include at EXACT frequency - CRITICAL):
-${required.map(t => {
+══════════════════════════════════════════════════════════════════════
+TOTAL KEYWORD DATA: ${terms.length} basic + ${analysis?.termsExtended?.length || 0} extended + ${analysis?.entities?.length || 0} entities
+══════════════════════════════════════════════════════════════════════
+
+### 🎯 REQUIRED KEYWORDS (MUST include at EXACT frequency - NON-NEGOTIABLE):
+${required.length > 0 ? required.map(t => {
   const range = t.sugg_usage ? `${t.sugg_usage[0]}-${t.sugg_usage[1]}x` : `${t.frequency}x`;
-  return `• "${t.term}" → use EXACTLY ${range} (${t.usage_pc || 70}% competitor usage)`;
+  return `• "${t.term}" → use EXACTLY ${range} (${t.usage_pc || 70}% of top competitors use this)`;
+}).join('\n') : '(No required terms - focus on recommended and extended terms below)'}
+
+### ⭐ RECOMMENDED KEYWORDS (include ALL of these - 100% coverage for 90%+ score):
+${recommended.slice(0, 35).map(t => {
+  const range = t.sugg_usage ? `${t.sugg_usage[0]}-${t.sugg_usage[1]}x` : '1-3x';
+  return `• "${t.term}" → target ${range} (${t.usage_pc || 50}% competitor usage)`;
 }).join('\n')}
 
-### RECOMMENDED KEYWORDS (include 80%+ of these naturally):
-${recommended.slice(0, 25).map(t => {
+### 📊 EXTENDED KEYWORDS (include 70%+ for comprehensive topical coverage):
+${(analysis?.termsExtended || []).slice(0, 50).map(t => {
   const range = t.sugg_usage ? `${t.sugg_usage[0]}-${t.sugg_usage[1]}x` : '1-2x';
-  return `• "${t.term}" → target ${range}`;
-}).join('\n')}`;
+  return `• "${t.term}" (${t.usage_pc || 30}%)`;
+}).join('\n')}
 
-    if (analysis?.termsExtended && analysis.termsExtended.length > 0) {
-      prompt += `\n\n### EXTENDED KEYWORDS (include 50%+ for comprehensive coverage):
-${analysis.termsExtended.slice(0, 30).map(t => `• "${t.term}"`).join('\n')}`;
-    }
-
-    if (analysis?.entities && analysis.entities.length > 0) {
-      prompt += `\n\n### NAMED ENTITIES - MANDATORY (mention ALL of these at least once):
-${analysis.entities.slice(0, 20).map(e => `• "${e.entity}"${e.type ? ` [${e.type}]` : ''}`).join('\n')}`;
-    }
+### 🏷️ NAMED ENTITIES - MANDATORY (mention EVERY entity at least once):
+${(analysis?.entities || []).slice(0, 30).map(e => `• "${e.entity}"${e.type ? ` [${e.type}]` : ''} - ${e.usage_pc || 30}% usage`).join('\n')}`;
 
     if (analysis?.headingsH2 && analysis.headingsH2.length > 0) {
-      prompt += `\n\n### USE THESE AS YOUR H2 HEADINGS (or very close variations):
-${analysis.headingsH2.slice(0, 12).map((h, i) => `${i + 1}. <h2>${h.text}</h2>`).join('\n')}`;
+      prompt += `\n
+### 📌 MANDATORY H2 HEADINGS (use these EXACT headings or very close variations):
+${analysis.headingsH2.slice(0, 15).map((h, i) => `${i + 1}. "${h.text}" (${h.usage_pc || 50}% competitor usage)`).join('\n')}`;
     }
 
     if (analysis?.headingsH3 && analysis.headingsH3.length > 0) {
-      prompt += `\n\n### USE THESE AS YOUR H3 SUBHEADINGS:
-${analysis.headingsH3.slice(0, 15).map(h => `• <h3>${h.text}</h3>`).join('\n')}`;
+      prompt += `\n
+### 📎 RECOMMENDED H3 SUBHEADINGS (use these under relevant H2s):
+${analysis.headingsH3.slice(0, 20).map(h => `• "${h.text}"`).join('\n')}`;
     }
 
-    prompt += `\n
-KEYWORD DISTRIBUTION RULES:
-• Spread keywords EVENLY across all sections (not clustered)
-• Primary keyword in first 100 words AND last 100 words
-• Required terms must appear in H2 headings when natural
-• Never list keywords - always in flowing sentences`;
+    prompt += `
+
+══════════════════════════════════════════════════════════════════════
+🚨 CRITICAL NEURONWRITER SCORE RULES (90%+ REQUIRED):
+══════════════════════════════════════════════════════════════════════
+1. REQUIRED terms: Use at EXACT frequency specified - no exceptions
+2. RECOMMENDED terms: Include 100% of them naturally throughout content
+3. EXTENDED terms: Include at least 70% for comprehensive topical coverage
+4. ENTITIES: Mention EVERY named entity at least once in relevant context
+5. HEADINGS: Use the H2 headings provided (or very close variations)
+6. DISTRIBUTION: Spread keywords EVENLY across ALL sections - not clustered
+7. NATURAL FLOW: Keywords must flow naturally in sentences - NEVER list them
+8. FIRST/LAST: Primary keyword MUST appear in first 100 AND last 100 words
+9. H2 KEYWORDS: Include required terms in at least 2-3 H2 headings
+10. DENSITY: Maintain 1-2% keyword density for primary term
+
+💡 TIP: The more terms you include naturally, the higher your NeuronWriter score!`;
 
     return prompt;
   }
