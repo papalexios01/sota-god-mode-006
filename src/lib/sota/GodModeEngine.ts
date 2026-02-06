@@ -1,22 +1,3 @@
-/**
- * God Mode 2.0 - SOTA Enterprise Autonomous SEO Engine
- * 
- * State-of-the-art 24/7 content optimization system featuring:
- * 1. Intelligent sitemap scanning with adaptive throttling
- * 2. Multi-dimensional SEO health scoring (E-E-A-T, Core Web Vitals proxy, freshness)
- * 3. AI-powered queue prioritization with urgency weighting
- * 4. Multi-pass quality assurance with NeuronWriter integration
- * 5. Enterprise retry logic with exponential backoff
- * 6. Real-time quality tracking and trend analysis
- * 7. Automatic WordPress publishing with SEO metadata
- * 
- * ENTERPRISE FEATURES:
- * - Priority Only Mode: Focused processing of critical URLs
- * - Multi-pass content improvement for guaranteed 90%+ scores
- * - Intelligent error recovery with circuit breaker pattern
- * - Comprehensive activity logging for audit trails
- */
-
 import { seoHealthScorer } from './SEOHealthScorer';
 import { EnterpriseContentOrchestrator } from './EnterpriseContentOrchestrator';
 import type {
@@ -27,7 +8,6 @@ import type {
   GodModeActivityItem,
   GodModeStatus,
   GodModePhase,
-  DEFAULT_GOD_MODE_CONFIG,
 } from './GodModeTypes';
 
 type StateUpdateCallback = (updates: Partial<GodModeState>) => void;
@@ -55,19 +35,25 @@ export interface GodModeEngineOptions {
     enableNeuronWriter?: boolean;
     neuronWriterApiKey?: string;
     neuronWriterProjectId?: string;
+    organizationName?: string;
+    authorName?: string;
+    serperApiKey?: string;
+    openrouterModelId?: string;
+    groqModelId?: string;
   };
 }
 
-// Enterprise constants
 const ENTERPRISE_CONSTANTS = {
-  MIN_QUALITY_SCORE: 90, // Target 90%+ for all metrics
-  MAX_QUALITY_IMPROVEMENT_PASSES: 3, // Multi-pass content improvement
-  EXPONENTIAL_BACKOFF_BASE_MS: 5000, // Base retry delay
-  EXPONENTIAL_BACKOFF_MAX_MS: 300000, // Max 5 min retry delay
-  CIRCUIT_BREAKER_THRESHOLD: 5, // Consecutive failures before circuit break
-  CIRCUIT_BREAKER_RESET_MS: 600000, // 10 min circuit breaker reset
-  ADAPTIVE_THROTTLE_MIN_MS: 2000, // Minimum request delay
-  ADAPTIVE_THROTTLE_MAX_MS: 10000, // Maximum request delay
+  MIN_QUALITY_SCORE: 90,
+  MAX_QUALITY_IMPROVEMENT_PASSES: 3,
+  EXPONENTIAL_BACKOFF_BASE_MS: 5000,
+  EXPONENTIAL_BACKOFF_MAX_MS: 300000,
+  CIRCUIT_BREAKER_THRESHOLD: 5,
+  CIRCUIT_BREAKER_RESET_MS: 600000,
+  ADAPTIVE_THROTTLE_MIN_MS: 2000,
+  ADAPTIVE_THROTTLE_MAX_MS: 10000,
+  SCORING_BATCH_SIZE: 50,
+  SCORING_CONCURRENCY: 3,
 };
 
 export class GodModeEngine {
@@ -80,32 +66,28 @@ export class GodModeEngine {
   private processedToday = 0;
   private lastScanTime: Date | null = null;
   private cycleCount = 0;
-  
-  // Enterprise tracking
+
   private consecutiveFailures = 0;
   private circuitBrokenUntil: Date | null = null;
   private qualityScoreHistory: number[] = [];
   private processingTimeHistory: number[] = [];
+  private adaptiveThrottleMs = ENTERPRISE_CONSTANTS.ADAPTIVE_THROTTLE_MIN_MS;
 
   constructor(options: GodModeEngineOptions) {
     this.options = options;
   }
 
-  /**
-   * Start the autonomous engine
-   */
   async start(): Promise<void> {
     if (this.isRunning) {
       this.log('warning', 'Engine already running');
       return;
     }
 
-    // ===== PRIORITY ONLY MODE VALIDATION =====
     if (this.options.priorityOnlyMode) {
       if (this.options.priorityUrls.length === 0) {
         throw new Error('Priority Only Mode requires at least one URL in the Priority Queue. Add URLs to your priority queue first.');
       }
-      this.log('info', '🎯 PRIORITY ONLY MODE ENABLED', 
+      this.log('info', 'PRIORITY ONLY MODE ENABLED',
         `Processing ONLY ${this.options.priorityUrls.length} priority URLs. Sitemap scanning is DISABLED.`);
     }
 
@@ -114,10 +96,11 @@ export class GodModeEngine {
     this.abortController = new AbortController();
     this.processedToday = 0;
     this.cycleCount = 0;
+    this.adaptiveThrottleMs = ENTERPRISE_CONSTANTS.ADAPTIVE_THROTTLE_MIN_MS;
 
-    const modeLabel = this.options.priorityOnlyMode ? '🎯 PRIORITY ONLY' : '🌐 FULL SITEMAP';
-    this.log('success', '🚀 GOD MODE 2.0 ACTIVATED', `Mode: ${modeLabel} | Autonomous SEO engine is now running`);
-    
+    const modeLabel = this.options.priorityOnlyMode ? 'PRIORITY ONLY' : 'FULL SITEMAP';
+    this.log('success', 'GOD MODE 2.0 ACTIVATED', `Mode: ${modeLabel} | Autonomous SEO engine is now running`);
+
     this.updateState({
       status: 'running',
       stats: {
@@ -133,53 +116,36 @@ export class GodModeEngine {
       },
     });
 
-    // Initialize orchestrator
     this.initializeOrchestrator();
 
-    // ===== PRIORITY ONLY MODE: Pre-populate queue =====
     if (this.options.priorityOnlyMode) {
       this.initializePriorityQueue();
     }
 
-    // Start the main loop
     await this.mainLoop();
   }
 
-  /**
-   * Initialize queue directly from priority URLs (Priority Only Mode)
-   * ENTERPRISE FEATURES:
-   * - Pre-flight validation of all URLs
-   * - Priority-weighted queue ordering
-   * - Estimated processing time calculation
-   * - NeuronWriter availability check
-   */
   private initializePriorityQueue(): void {
     this.queue = [];
-    
+
     const appConfig = this.options.getAppConfig();
     const hasNeuronWriter = !!(appConfig.neuronWriterApiKey && appConfig.neuronWriterProjectId);
-    
-    // Enterprise logging header
-    this.log('info', '═══════════════════════════════════════════════════', '');
-    this.log('info', '🎯 PRIORITY ONLY MODE - ENTERPRISE INITIALIZATION', '');
-    this.log('info', '═══════════════════════════════════════════════════', '');
-    
-    // Pre-flight checks
-    this.log('info', '📋 Pre-flight Checks', '');
-    this.log('info', `  • Total Priority URLs: ${this.options.priorityUrls.length}`, '');
-    this.log('info', `  • NeuronWriter: ${hasNeuronWriter ? '✅ ENABLED (90%+ scores guaranteed)' : '⚠️ DISABLED (basic scoring)'}`, '');
-    this.log('info', `  • Quality Threshold: ${this.options.config.qualityThreshold}%`, '');
-    this.log('info', `  • Multi-pass Quality: ${ENTERPRISE_CONSTANTS.MAX_QUALITY_IMPROVEMENT_PASSES} passes max`, '');
-    this.log('info', `  • Retry Attempts: ${this.options.config.retryAttempts} with exponential backoff`, '');
-    
-    // Categorize by priority
+
+    this.log('info', '=== PRIORITY ONLY MODE - INITIALIZATION ===', '');
+
+    this.log('info', 'Pre-flight Checks', '');
+    this.log('info', `  Total Priority URLs: ${this.options.priorityUrls.length}`, '');
+    this.log('info', `  NeuronWriter: ${hasNeuronWriter ? 'ENABLED' : 'DISABLED (basic scoring)'}`, '');
+    this.log('info', `  Quality Threshold: ${this.options.config.qualityThreshold}%`, '');
+    this.log('info', `  Multi-pass Quality: ${ENTERPRISE_CONSTANTS.MAX_QUALITY_IMPROVEMENT_PASSES} passes max`, '');
+    this.log('info', `  Retry Attempts: ${this.options.config.retryAttempts} with exponential backoff`, '');
+
     const priorityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
     let excludedCount = 0;
-    
+
     for (const priorityUrl of this.options.priorityUrls) {
-      // Skip excluded URLs
       if (this.isExcluded(priorityUrl.url)) {
-        this.log('info', `  ⏭️ Excluded: ${this.getSlug(priorityUrl.url)}`);
+        this.log('info', `  Excluded: ${this.getSlug(priorityUrl.url)}`);
         excludedCount++;
         continue;
       }
@@ -201,164 +167,149 @@ export class GodModeEngine {
       });
     }
 
-    // Sort by priority (critical first)
     this.sortQueue();
-    
     this.updateState({ queue: this.queue });
-    
-    // Enterprise summary
-    this.log('info', '', '');
-    this.log('info', '📊 Queue Summary', '');
-    this.log('info', `  • 🔴 Critical: ${priorityCounts.critical}`, '');
-    this.log('info', `  • 🟠 High: ${priorityCounts.high}`, '');
-    this.log('info', `  • 🟡 Medium: ${priorityCounts.medium}`, '');
-    this.log('info', `  • 🟢 Low: ${priorityCounts.low}`, '');
-    this.log('info', `  • ⏭️ Excluded: ${excludedCount}`, '');
-    
-    // Estimated processing time (rough calculation)
-    const avgTimePerUrl = hasNeuronWriter ? 180 : 120; // seconds
+
+    this.log('info', 'Queue Summary', '');
+    this.log('info', `  Critical: ${priorityCounts.critical}`, '');
+    this.log('info', `  High: ${priorityCounts.high}`, '');
+    this.log('info', `  Medium: ${priorityCounts.medium}`, '');
+    this.log('info', `  Low: ${priorityCounts.low}`, '');
+    this.log('info', `  Excluded: ${excludedCount}`, '');
+
+    const avgTimePerUrl = hasNeuronWriter ? 180 : 120;
     const estimatedMinutes = Math.ceil((this.queue.length * avgTimePerUrl) / 60);
-    this.log('info', `  • ⏱️ Estimated Time: ~${estimatedMinutes} minutes`, '');
-    
-    this.log('info', '═══════════════════════════════════════════════════', '');
-    this.log('success', '🎯 Priority Queue Ready', 
+    this.log('info', `  Estimated Time: ~${estimatedMinutes} minutes`, '');
+
+    this.log('success', 'Priority Queue Ready',
       `${this.queue.length} URLs queued | NeuronWriter: ${hasNeuronWriter ? 'ON' : 'OFF'} | ETA: ~${estimatedMinutes}min`);
   }
 
-  /**
-   * Stop the engine gracefully
-   */
   stop(): void {
-    this.log('info', '⏹️ Stopping God Mode...', 'Graceful shutdown initiated');
+    this.log('info', 'Stopping God Mode...', 'Graceful shutdown initiated');
     this.isRunning = false;
     this.isPaused = false;
     this.abortController?.abort();
     this.abortController = null;
-    
+
     this.updateState({
       status: 'idle',
       currentPhase: null,
       currentUrl: null,
     });
-    
-    this.log('success', '✅ God Mode stopped', `Processed ${this.cycleCount} cycles this session`);
+
+    this.log('success', 'God Mode stopped', `Processed ${this.cycleCount} cycles this session`);
   }
 
-  /**
-   * Pause the engine (maintains state)
-   */
   pause(): void {
     if (!this.isRunning) return;
-    
+
     this.isPaused = true;
-    this.log('info', '⏸️ God Mode paused', 'Processing will resume when unpaused');
+    this.log('info', 'God Mode paused', 'Processing will resume when unpaused');
     this.updateState({ status: 'paused' });
   }
 
-  /**
-   * Resume from paused state
-   */
   resume(): void {
     if (!this.isRunning || !this.isPaused) return;
-    
+
     this.isPaused = false;
-    this.log('info', '▶️ God Mode resumed', 'Continuing autonomous processing');
+    this.log('info', 'God Mode resumed', 'Continuing autonomous processing');
     this.updateState({ status: 'running' });
   }
 
-  /**
-   * Main processing loop
-   */
   private async mainLoop(): Promise<void> {
     while (this.isRunning && !this.abortController?.signal.aborted) {
       try {
-        // Check if paused
         if (this.isPaused) {
           await this.sleep(1000);
           continue;
         }
 
-        // Check active hours
         if (!this.isWithinActiveHours()) {
-          this.log('info', '💤 Outside active hours', `Will resume at ${this.options.config.activeHoursStart}:00`);
-          await this.sleep(60000); // Check every minute
+          this.log('info', 'Outside active hours', `Will resume at ${this.options.config.activeHoursStart}:00`);
+          await this.sleep(60000);
           continue;
         }
 
-        // Check daily limit
         if (this.processedToday >= this.options.config.maxPerDay) {
-          this.log('info', '📊 Daily limit reached', `Processed ${this.processedToday}/${this.options.config.maxPerDay} articles today`);
-          await this.sleep(3600000); // Check every hour
+          this.log('info', 'Daily limit reached', `Processed ${this.processedToday}/${this.options.config.maxPerDay} articles today`);
+          await this.sleep(3600000);
           continue;
         }
 
         this.cycleCount++;
         this.updateState({ stats: { ...this.getDefaultStats(), cycleCount: this.cycleCount } });
 
-        // ===== PRIORITY ONLY MODE: Simplified flow =====
         if (this.options.priorityOnlyMode) {
-          // No sitemap scanning - go directly to generation
           if (this.queue.length > 0) {
             await this.runGenerationPhase();
           } else {
-            this.log('success', '🎯 Priority Queue Complete', 
+            this.log('success', 'Priority Queue Complete',
               'All priority URLs have been processed. Add more URLs to continue or disable Priority Only Mode.');
-            // In Priority Only Mode, we're done when queue is empty
             this.updateState({ status: 'idle', currentPhase: null });
             this.stop();
             return;
           }
         } else {
-          // ===== FULL SITEMAP MODE: Complete flow =====
-          
-          // PHASE 1: Sitemap Scan (if needed)
           if (this.shouldScan()) {
             await this.runScanPhase();
           }
 
-          // PHASE 2: Health Scoring (if queue is empty)
           if (this.queue.length === 0) {
             await this.runScoringPhase();
           }
 
-          // PHASE 3: Content Generation
           if (this.queue.length > 0) {
             await this.runGenerationPhase();
           } else {
-            this.log('info', '✨ Queue empty', 'All pages are healthy or excluded. Waiting for next scan cycle...');
+            this.log('info', 'Queue empty', 'All pages are healthy or excluded. Waiting for next scan cycle...');
             await this.sleep(this.options.config.processingIntervalMinutes * 60 * 1000);
           }
         }
 
       } catch (error) {
         if (this.abortController?.signal.aborted) break;
-        
+
         const message = error instanceof Error ? error.message : 'Unknown error';
-        this.log('error', '❌ Cycle error', message);
+        this.log('error', 'Cycle error', message);
         this.updateState({ status: 'error', lastError: message });
-        
-        // Exponential backoff
+
         await this.sleep(Math.min(300000, 30000 * Math.pow(2, this.cycleCount % 5)));
       }
     }
   }
 
-  /**
-   * Phase 1: Sitemap Scanning
-   * Note: This phase is SKIPPED in Priority Only Mode
-   */
   private async runScanPhase(): Promise<void> {
-    // Double-check: This should never be called in Priority Only Mode
     if (this.options.priorityOnlyMode) {
-      this.log('warning', '🎯 Priority Only Mode Active', 'Sitemap scan phase was unexpectedly called - skipping');
+      this.log('warning', 'Priority Only Mode Active', 'Sitemap scan phase was unexpectedly called - skipping');
       return;
     }
 
     this.updateState({ currentPhase: 'scanning' });
-    this.log('info', '🔍 Scanning sitemap...', `${this.options.sitemapUrls.length} URLs available`);
+    this.log('info', 'Scanning sitemap...', `${this.options.sitemapUrls.length} URLs available`);
+
+    const validUrls: string[] = [];
+    const invalidUrls: string[] = [];
+
+    for (const url of this.options.sitemapUrls) {
+      if (this.abortController?.signal.aborted || this.isPaused) break;
+
+      if (this.isExcluded(url)) continue;
+
+      try {
+        new URL(url);
+        validUrls.push(url);
+      } catch {
+        invalidUrls.push(url);
+      }
+    }
+
+    if (invalidUrls.length > 0) {
+      this.log('warning', `${invalidUrls.length} invalid URLs skipped during scan`);
+    }
 
     this.lastScanTime = new Date();
-    
+
     this.updateState({
       stats: {
         ...this.getDefaultStats(),
@@ -367,163 +318,176 @@ export class GodModeEngine {
       },
     });
 
-    this.log('success', '✅ Sitemap scan complete', `Found ${this.options.sitemapUrls.length} URLs`);
+    this.log('success', 'Sitemap scan complete', `${validUrls.length} valid URLs found, ${invalidUrls.length} invalid`);
   }
 
-  /**
-   * Phase 2: SEO Health Scoring
-   */
   private async runScoringPhase(): Promise<void> {
     this.updateState({ currentPhase: 'scoring' });
-    
-    // Get URLs to score
+
     const urlsToScore = this.options.priorityOnlyMode
       ? this.options.priorityUrls.map(p => p.url)
       : this.options.sitemapUrls;
 
-    // Filter excluded URLs
     const filteredUrls = urlsToScore.filter(url => !this.isExcluded(url));
 
     if (filteredUrls.length === 0) {
-      this.log('warning', '⚠️ No URLs to score', 'Check exclusion rules or add priority URLs');
+      this.log('warning', 'No URLs to score', 'Check exclusion rules or add priority URLs');
       return;
     }
 
-    this.log('info', '📊 Scoring page health...', `Analyzing ${filteredUrls.length} pages`);
+    const batchSize = Math.min(filteredUrls.length, ENTERPRISE_CONSTANTS.SCORING_BATCH_SIZE);
+    this.log('info', 'Scoring page health...', `Analyzing ${batchSize} of ${filteredUrls.length} pages`);
 
-    // Score pages in batches
-    const urlsToAnalyze = filteredUrls.slice(0, 20); // Limit to 20 at a time
-    
-    for (let i = 0; i < urlsToAnalyze.length; i++) {
+    const urlsToAnalyze = filteredUrls.slice(0, batchSize);
+    let scored = 0;
+
+    for (let i = 0; i < urlsToAnalyze.length; i += ENTERPRISE_CONSTANTS.SCORING_CONCURRENCY) {
       if (this.abortController?.signal.aborted || this.isPaused) break;
-      
-      const url = urlsToAnalyze[i];
-      this.updateState({ currentUrl: url });
-      
-      try {
-        const analysis = await seoHealthScorer.analyzePage(url);
-        
-        if (analysis.score < this.options.config.minHealthScore && !this.queue.some(q => q.url === url)) {
-          const priority = this.calculatePriority(analysis.score, url);
 
-          this.queue.push({
-            id: crypto.randomUUID(),
-            url,
-            priority,
-            healthScore: analysis.score,
-            addedAt: new Date(),
-            source: this.options.priorityUrls.some(p => p.url === url) ? 'manual' : 'scan',
-            retryCount: 0,
-          });
+      const batch = urlsToAnalyze.slice(i, i + ENTERPRISE_CONSTANTS.SCORING_CONCURRENCY);
 
-          this.log('info', `📋 Queued: ${this.getSlug(url)}`, `Score: ${analysis.score} | Priority: ${priority}`);
+      const results = await Promise.allSettled(
+        batch.map(async (url) => {
+          this.updateState({ currentUrl: url });
+          return { url, analysis: await seoHealthScorer.analyzePage(url) };
+        })
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          const { url, analysis } = result.value;
+          scored++;
+
+          if (analysis.score < this.options.config.minHealthScore && !this.queue.some(q => q.url === url)) {
+            const priority = this.calculatePriority(analysis.score, url);
+
+            this.queue.push({
+              id: crypto.randomUUID(),
+              url,
+              priority,
+              healthScore: analysis.score,
+              addedAt: new Date(),
+              source: this.options.priorityUrls.some(p => p.url === url) ? 'manual' : 'scan',
+              retryCount: 0,
+            });
+
+            this.log('info', `Queued: ${this.getSlug(url)}`, `Score: ${analysis.score} | Priority: ${priority}`);
+          }
+        } else {
+          this.log('warning', `Failed to score URL`, result.reason instanceof Error ? result.reason.message : 'Unknown error');
         }
-        
-        // Throttle
-        await this.sleep(500);
-      } catch (error) {
-        this.log('warning', `⚠️ Failed to score ${this.getSlug(url)}`, error instanceof Error ? error.message : 'Unknown error');
       }
+
+      this.log('info', `Scoring progress: ${scored}/${urlsToAnalyze.length}`, '');
+
+      await this.sleep(this.adaptiveThrottleMs);
     }
 
-    // Sort queue by priority
     this.sortQueue();
-    
+
     this.updateState({
       queue: this.queue,
       currentUrl: null,
     });
 
-    this.log('success', '✅ Scoring complete', `${this.queue.length} pages need optimization`);
+    this.log('success', 'Scoring complete', `${this.queue.length} pages need optimization (scored ${scored} pages)`);
   }
 
-  /**
-   * Check if circuit breaker is active (too many consecutive failures)
-   */
   private isCircuitBroken(): boolean {
     if (!this.circuitBrokenUntil) return false;
     if (new Date() >= this.circuitBrokenUntil) {
       this.circuitBrokenUntil = null;
       this.consecutiveFailures = 0;
-      this.log('info', '🔄 Circuit breaker reset', 'Resuming normal operations');
+      this.log('info', 'Circuit breaker reset', 'Resuming normal operations');
       return false;
     }
     return true;
   }
 
-  /**
-   * Calculate exponential backoff delay
-   */
   private calculateBackoffDelay(retryCount: number): number {
     const delay = Math.min(
       ENTERPRISE_CONSTANTS.EXPONENTIAL_BACKOFF_BASE_MS * Math.pow(2, retryCount),
       ENTERPRISE_CONSTANTS.EXPONENTIAL_BACKOFF_MAX_MS
     );
-    // Add jitter (±20%) to prevent thundering herd
     const jitter = delay * 0.2 * (Math.random() - 0.5);
     return Math.floor(delay + jitter);
   }
 
-  /**
-   * Record success and reset failure tracking
-   */
   private recordSuccess(qualityScore: number, processingTime: number): void {
     this.consecutiveFailures = 0;
     this.qualityScoreHistory.push(qualityScore);
     this.processingTimeHistory.push(processingTime);
-    
-    // Keep only last 50 entries for trend analysis
+
     if (this.qualityScoreHistory.length > 50) this.qualityScoreHistory.shift();
     if (this.processingTimeHistory.length > 50) this.processingTimeHistory.shift();
+
+    this.adjustAdaptiveThrottle(processingTime, true);
   }
 
-  /**
-   * Record failure and potentially trigger circuit breaker
-   */
   private recordFailure(): void {
     this.consecutiveFailures++;
-    
+
+    this.adjustAdaptiveThrottle(0, false);
+
     if (this.consecutiveFailures >= ENTERPRISE_CONSTANTS.CIRCUIT_BREAKER_THRESHOLD) {
       this.circuitBrokenUntil = new Date(Date.now() + ENTERPRISE_CONSTANTS.CIRCUIT_BREAKER_RESET_MS);
-      this.log('warning', '⚡ Circuit breaker activated', 
+      this.log('warning', 'Circuit breaker activated',
         `Too many consecutive failures (${this.consecutiveFailures}). Pausing for ${ENTERPRISE_CONSTANTS.CIRCUIT_BREAKER_RESET_MS / 60000} minutes.`);
     }
   }
 
-  /**
-   * Get quality trend (average of last N scores)
-   */
+  private adjustAdaptiveThrottle(processingTimeMs: number, success: boolean): void {
+    if (success) {
+      if (processingTimeMs < 30000) {
+        this.adaptiveThrottleMs = Math.max(
+          ENTERPRISE_CONSTANTS.ADAPTIVE_THROTTLE_MIN_MS,
+          this.adaptiveThrottleMs * 0.85
+        );
+      } else {
+        this.adaptiveThrottleMs = Math.min(
+          ENTERPRISE_CONSTANTS.ADAPTIVE_THROTTLE_MAX_MS,
+          this.adaptiveThrottleMs * 1.1
+        );
+      }
+    } else {
+      this.adaptiveThrottleMs = Math.min(
+        ENTERPRISE_CONSTANTS.ADAPTIVE_THROTTLE_MAX_MS,
+        this.adaptiveThrottleMs * 1.5
+      );
+    }
+  }
+
   getQualityTrend(): { avg: number; trend: 'improving' | 'declining' | 'stable' } {
     if (this.qualityScoreHistory.length < 2) {
       return { avg: 0, trend: 'stable' };
     }
-    
+
     const avg = this.qualityScoreHistory.reduce((a, b) => a + b, 0) / this.qualityScoreHistory.length;
     const recentAvg = this.qualityScoreHistory.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, this.qualityScoreHistory.length);
     const olderAvg = this.qualityScoreHistory.slice(0, -5).reduce((a, b) => a + b, 0) / Math.max(1, this.qualityScoreHistory.length - 5);
-    
+
     let trend: 'improving' | 'declining' | 'stable' = 'stable';
     if (recentAvg > olderAvg + 3) trend = 'improving';
     else if (recentAvg < olderAvg - 3) trend = 'declining';
-    
+
     return { avg, trend };
   }
 
-  /**
-   * Phase 3: ENTERPRISE Content Generation & Publishing
-   * Features: Multi-pass quality assurance, circuit breaker, exponential backoff
-   */
   private async runGenerationPhase(): Promise<void> {
-    // Check circuit breaker before processing
     if (this.isCircuitBroken()) {
       const waitTime = this.circuitBrokenUntil ? Math.ceil((this.circuitBrokenUntil.getTime() - Date.now()) / 60000) : 0;
-      this.log('warning', '⚡ Circuit breaker active', `Waiting ${waitTime} more minutes before retry`);
-      await this.sleep(60000); // Wait 1 min and check again
+      this.log('warning', 'Circuit breaker active', `Waiting ${waitTime} more minutes before retry`);
+      await this.sleep(60000);
       return;
     }
 
     const item = this.queue.shift();
     if (!item) return;
+
+    const totalInQueue = this.queue.length;
+    const positionLabel = this.options.priorityOnlyMode
+      ? `${this.options.priorityUrls.length - totalInQueue}/${this.options.priorityUrls.length}`
+      : '';
 
     this.updateState({
       currentPhase: 'generating',
@@ -533,61 +497,54 @@ export class GodModeEngine {
 
     const startTime = Date.now();
     const isPriorityItem = this.options.priorityOnlyMode || item.source === 'manual';
-    
-    this.log('info', `⚡ ${isPriorityItem ? '🎯 PRIORITY' : ''} Generating content...`, 
+
+    this.log('info', `${isPriorityItem ? '[PRIORITY] ' : ''}Generating content ${positionLabel}`,
       `URL: ${this.getSlug(item.url)} | Retry: ${item.retryCount}/${this.options.config.retryAttempts}`);
 
     try {
-      // Extract keyword from URL slug
       const keyword = this.extractKeyword(item.url);
-      
+
       if (!this.orchestrator) {
         throw new Error('Content orchestrator not initialized');
       }
 
-      // === ENTERPRISE: Multi-pass content generation for guaranteed quality ===
       let content: any = null;
       let qualityScore = 0;
       let passCount = 0;
       const maxPasses = isPriorityItem ? ENTERPRISE_CONSTANTS.MAX_QUALITY_IMPROVEMENT_PASSES : 1;
-      
-      this.log('info', `🔄 Starting content generation`, 
+
+      this.log('info', `Starting content generation`,
         isPriorityItem ? `Priority mode: up to ${maxPasses} quality passes` : 'Standard mode: single pass');
 
       while (passCount < maxPasses) {
         passCount++;
-        
-        // Generate content with progressive quality focus
+
         content = await this.orchestrator.generateContent({
           keyword,
           onProgress: (msg) => this.log('info', `[Pass ${passCount}/${maxPasses}] ${msg}`),
         });
 
         qualityScore = content.qualityScore?.overall || 0;
-        
-        this.log('info', `📊 Pass ${passCount} complete`, 
+
+        this.log('info', `Pass ${passCount} complete`,
           `Quality: ${qualityScore}% | Target: ${ENTERPRISE_CONSTANTS.MIN_QUALITY_SCORE}%`);
 
-        // Check if we've achieved target quality
         if (qualityScore >= ENTERPRISE_CONSTANTS.MIN_QUALITY_SCORE) {
-          this.log('success', `✅ Target quality achieved!`, `Score: ${qualityScore}% after ${passCount} pass(es)`);
+          this.log('success', `Target quality achieved!`, `Score: ${qualityScore}% after ${passCount} pass(es)`);
           break;
         }
 
-        // If more passes available and quality is below target, continue
         if (passCount < maxPasses) {
-          this.log('info', `🔄 Quality below target, initiating improvement pass ${passCount + 1}...`);
-          await this.sleep(2000); // Brief pause between passes
+          this.log('info', `Quality below target, initiating improvement pass ${passCount + 1}...`);
+          await this.sleep(2000);
         }
       }
 
       const processingTime = Date.now() - startTime;
       const wordCount = content?.metrics?.wordCount || 0;
 
-      // Record success for circuit breaker and trend analysis
       this.recordSuccess(qualityScore, processingTime);
 
-      // Prepare generated content for storage (always store for review access)
       const generatedContent = {
         title: content?.title || '',
         content: content?.content || '',
@@ -596,12 +553,10 @@ export class GodModeEngine {
         slug: this.getSlug(item.url),
       };
 
-      // Check quality threshold
       if (qualityScore < this.options.config.qualityThreshold) {
-        this.log('warning', `⚠️ Below quality threshold after ${passCount} passes`, 
+        this.log('warning', `Below quality threshold after ${passCount} passes`,
           `Score: ${qualityScore}/${this.options.config.qualityThreshold}`);
-        
-        // Store content anyway for manual review/publishing
+
         this.addToHistory({
           url: item.url,
           action: 'skipped',
@@ -611,19 +566,22 @@ export class GodModeEngine {
           error: `Quality score ${qualityScore}% below threshold ${this.options.config.qualityThreshold}% after ${passCount} pass(es)`,
           generatedContent,
         });
-        
-        this.log('info', `📄 Content saved for review`, `Click "View" in history to access and manually publish`);
-        
+
+        this.log('info', `Content saved for review`, `Click "View" in history to access and manually publish`);
+
+        this.updateStats(qualityScore, wordCount, true);
+        this.processedToday++;
+
+        await this.sleep(this.adaptiveThrottleMs);
         return;
       }
 
-      // Auto-publish or queue for review
       if (this.options.config.autoPublish) {
         await this.runPublishPhase(item, content, processingTime, qualityScore);
       } else {
-        this.log('success', `✅ ENTERPRISE Content Generated`, 
-          `Score: ${qualityScore}% | Words: ${wordCount.toLocaleString()} | Time: ${Math.round(processingTime/1000)}s | Passes: ${passCount}`);
-        
+        this.log('success', `Content Generated`,
+          `Score: ${qualityScore}% | Words: ${wordCount.toLocaleString()} | Time: ${Math.round(processingTime / 1000)}s | Passes: ${passCount}`);
+
         this.addToHistory({
           url: item.url,
           action: 'generated',
@@ -635,44 +593,39 @@ export class GodModeEngine {
       }
 
       this.processedToday++;
-      
-      // Update stats
       this.updateStats(qualityScore, wordCount, true);
 
-      // Adaptive wait based on processing success
       const waitTime = this.options.config.processingIntervalMinutes * 60 * 1000;
-      this.log('info', `⏱️ Next item in ${this.options.config.processingIntervalMinutes} minutes`);
+      if (this.queue.length > 0) {
+        this.log('info', `Next item in ${this.options.config.processingIntervalMinutes} minutes (${this.queue.length} remaining)`);
+      }
       await this.sleep(waitTime);
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Generation failed';
-      this.log('error', `❌ Generation failed`, message);
-      
-      // Record failure for circuit breaker
+      this.log('error', `Generation failed`, message);
+
       this.recordFailure();
-      
-      // Enterprise retry logic with exponential backoff
+
       if (item.retryCount < this.options.config.retryAttempts) {
         item.retryCount++;
         item.lastError = message;
-        
-        // Calculate and apply exponential backoff delay
+
         const backoffDelay = this.calculateBackoffDelay(item.retryCount);
         const backoffSeconds = Math.round(backoffDelay / 1000);
-        
-        this.log('info', `🔄 Retry scheduled`, 
+
+        this.log('info', `Retry scheduled`,
           `Attempt ${item.retryCount}/${this.options.config.retryAttempts} after ${backoffSeconds}s backoff`);
-        
-        // Wait for backoff period before requeuing
+
         await this.sleep(backoffDelay);
-        
+
         this.queue.push(item);
         this.sortQueue();
         this.updateState({ queue: this.queue });
       } else {
-        this.log('error', `❌ Max retries exceeded`, 
+        this.log('error', `Max retries exceeded`,
           `Giving up on ${this.getSlug(item.url)} after ${item.retryCount} attempts`);
-        
+
         this.addToHistory({
           url: item.url,
           action: 'error',
@@ -680,14 +633,11 @@ export class GodModeEngine {
           processingTimeMs: Date.now() - startTime,
         });
       }
-      
+
       this.updateStats(0, 0, false);
     }
   }
 
-  /**
-   * Phase 4: WordPress Publishing
-   */
   private async runPublishPhase(
     item: GodModeQueueItem,
     content: any,
@@ -695,13 +645,13 @@ export class GodModeEngine {
     qualityScore: number
   ): Promise<void> {
     this.updateState({ currentPhase: 'publishing' });
-    this.log('info', `📤 Publishing to WordPress...`, this.getSlug(item.url));
+    this.log('info', `Publishing to WordPress...`, this.getSlug(item.url));
 
     const wordCount = content.metrics?.wordCount || 0;
 
     try {
       const appConfig = this.options.getAppConfig();
-      
+
       if (!appConfig.wpUrl || !appConfig.wpUsername || !appConfig.wpAppPassword) {
         throw new Error('WordPress credentials not configured');
       }
@@ -729,9 +679,9 @@ export class GodModeEngine {
       }
 
       const result = await response.json();
-      
-      this.log('success', `✅ Published!`, `${result.link || item.url}`);
-      
+
+      this.log('success', `Published!`, `${result.link || item.url}`);
+
       this.addToHistory({
         url: item.url,
         action: 'published',
@@ -739,28 +689,39 @@ export class GodModeEngine {
         wordPressUrl: result.link,
         processingTimeMs: processingTime,
         wordCount,
+        generatedContent: {
+          title: content.title || '',
+          content: content.content || '',
+          seoTitle: content.seoTitle || '',
+          metaDescription: content.metaDescription || '',
+          slug: this.getSlug(item.url),
+        },
       });
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Publish failed';
-      this.log('error', `❌ Publish failed`, message);
-      
-      // Still count as generated even if publish failed
+      this.log('error', `Publish failed`, message);
+
       this.addToHistory({
         url: item.url,
         action: 'error',
         qualityScore,
         error: `Generated but publish failed: ${message}`,
         processingTimeMs: processingTime,
+        generatedContent: {
+          title: content.title || '',
+          content: content.content || '',
+          seoTitle: content.seoTitle || '',
+          metaDescription: content.metaDescription || '',
+          slug: this.getSlug(item.url),
+        },
       });
     }
   }
 
-  // ===== HELPER METHODS =====
-
   private initializeOrchestrator(): void {
     const appConfig = this.options.getAppConfig();
-    
+
     this.orchestrator = new EnterpriseContentOrchestrator({
       apiKeys: {
         geminiApiKey: appConfig.geminiApiKey || '',
@@ -768,11 +729,13 @@ export class GodModeEngine {
         anthropicApiKey: appConfig.anthropicApiKey,
         openrouterApiKey: appConfig.openrouterApiKey,
         groqApiKey: appConfig.groqApiKey,
-        serperApiKey: '',
+        serperApiKey: appConfig.serperApiKey || '',
+        openrouterModelId: appConfig.openrouterModelId,
+        groqModelId: appConfig.groqModelId,
       },
-      organizationName: '',
+      organizationName: appConfig.organizationName || '',
       organizationUrl: appConfig.wpUrl || '',
-      authorName: '',
+      authorName: appConfig.authorName || '',
       primaryModel: appConfig.primaryModel as any,
       neuronWriterApiKey: appConfig.neuronWriterApiKey,
       neuronWriterProjectId: appConfig.neuronWriterProjectId,
@@ -781,7 +744,7 @@ export class GodModeEngine {
 
   private shouldScan(): boolean {
     if (!this.lastScanTime) return true;
-    
+
     const hoursSinceLastScan = (Date.now() - this.lastScanTime.getTime()) / (1000 * 60 * 60);
     return hoursSinceLastScan >= this.options.config.scanIntervalHours;
   }
@@ -795,13 +758,12 @@ export class GodModeEngine {
   private isWithinActiveHours(): boolean {
     const hour = new Date().getHours();
     const day = new Date().getDay();
-    
-    // Check weekend
+
     if (!this.options.config.enableWeekends && (day === 0 || day === 6)) {
       return false;
     }
-    
-    return hour >= this.options.config.activeHoursStart && 
+
+    return hour >= this.options.config.activeHoursStart &&
            hour < this.options.config.activeHoursEnd;
   }
 
@@ -834,11 +796,9 @@ export class GodModeEngine {
   }
 
   private calculatePriority(score: number, url: string): GodModeQueueItem['priority'] {
-    // Check if in priority URLs
     const priorityUrl = this.options.priorityUrls.find(p => p.url === url);
     if (priorityUrl) return priorityUrl.priority;
-    
-    // Score-based priority
+
     if (score < 30) return 'critical';
     if (score < 50) return 'high';
     if (score < 70) return 'medium';
@@ -848,11 +808,8 @@ export class GodModeEngine {
   private sortQueue(): void {
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     this.queue.sort((a, b) => {
-      // First by priority
       const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
       if (priorityDiff !== 0) return priorityDiff;
-      
-      // Then by health score (lower is more urgent)
       return a.healthScore - b.healthScore;
     });
   }
@@ -876,18 +833,16 @@ export class GodModeEngine {
   }
 
   private addToHistory(item: Omit<GodModeHistoryItem, 'id' | 'timestamp'>): void {
-    // This will be called by the hook to update state
     this.options.onStateUpdate({
       history: [{
         id: crypto.randomUUID(),
         timestamp: new Date(),
         ...item,
-      }] as any, // Append handled by hook
+      }] as any,
     });
   }
 
   private updateStats(qualityScore: number, wordCount: number, success: boolean): void {
-    // Stats update handled by hook
     const update = {
       totalProcessed: 1,
       successCount: success ? 1 : 0,
@@ -895,7 +850,7 @@ export class GodModeEngine {
       qualityScore,
       wordCount,
     };
-    
+
     this.options.onStateUpdate({ stats: update as any });
   }
 
@@ -931,8 +886,6 @@ export class GodModeEngine {
       });
     });
   }
-
-  // ===== PUBLIC GETTERS =====
 
   get status(): GodModeStatus {
     if (this.isPaused) return 'paused';

@@ -42,16 +42,15 @@ export function useGodModeEngine() {
       delete updates.history;
     }
     
-    // Handle stats increment specially
     if (updates.stats && typeof updates.stats === 'object') {
-      const statsUpdate = updates.stats as Partial<GodModeStats>;
+      const statsUpdate = updates.stats as Record<string, unknown>;
       if (statsUpdate.totalProcessed !== undefined) {
         updateGodModeStats({
-          totalProcessed: statsUpdate.totalProcessed,
-          successCount: statsUpdate.successCount || 0,
-          errorCount: statsUpdate.errorCount || 0,
-          qualityScore: statsUpdate.avgQualityScore || 0,
-          wordCount: statsUpdate.totalWordsGenerated || 0,
+          totalProcessed: statsUpdate.totalProcessed as number,
+          successCount: (statsUpdate.successCount as number) || 0,
+          errorCount: (statsUpdate.errorCount as number) || 0,
+          qualityScore: (statsUpdate.qualityScore as number) || (statsUpdate.avgQualityScore as number) || 0,
+          wordCount: (statsUpdate.wordCount as number) || (statsUpdate.totalWordsGenerated as number) || 0,
         });
         delete updates.stats;
       }
@@ -86,6 +85,11 @@ export function useGodModeEngine() {
     enableNeuronWriter: appConfig.enableNeuronWriter,
     neuronWriterApiKey: appConfig.neuronWriterApiKey,
     neuronWriterProjectId: appConfig.neuronWriterProjectId,
+    organizationName: appConfig.organizationName,
+    authorName: appConfig.authorName,
+    serperApiKey: appConfig.serperApiKey,
+    openrouterModelId: appConfig.openrouterModelId,
+    groqModelId: appConfig.groqModelId,
   }), [appConfig]);
 
   /**
