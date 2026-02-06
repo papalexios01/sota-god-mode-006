@@ -29,80 +29,62 @@ function isPublicUrl(input: string): boolean {
 }
 
 export function registerRoutes(app: Express): void {
-  app.get("/api/blog-posts", async (_req: Request, res: Response) => {
-    try {
-      const posts = await db
-        .select()
-        .from(generatedBlogPosts)
-        .orderBy(desc(generatedBlogPosts.generatedAt));
+  if (db) {
+    app.get("/api/blog-posts", async (_req: Request, res: Response) => {
+      try {
+        const posts = await db!
+          .select()
+          .from(generatedBlogPosts)
+          .orderBy(desc(generatedBlogPosts.generatedAt));
 
-      const store: Record<string, unknown> = {};
-      for (const row of posts) {
-        store[row.itemId] = {
-          id: row.id,
-          title: row.title,
-          seoTitle: row.seoTitle,
-          content: row.content,
-          metaDescription: row.metaDescription,
-          slug: row.slug,
-          primaryKeyword: row.primaryKeyword,
-          secondaryKeywords: row.secondaryKeywords || [],
-          wordCount: row.wordCount,
-          qualityScore: row.qualityScore || {
-            overall: 0,
-            readability: 0,
-            seo: 0,
-            eeat: 0,
-            uniqueness: 0,
-            factAccuracy: 0,
-          },
-          internalLinks: row.internalLinks || [],
-          schema: row.schema,
-          serpAnalysis: row.serpAnalysis,
-          neuronWriterQueryId: row.neuronwriterQueryId,
-          generatedAt: row.generatedAt?.toISOString(),
-          model: row.model,
-        };
+        const store: Record<string, unknown> = {};
+        for (const row of posts) {
+          store[row.itemId] = {
+            id: row.id,
+            title: row.title,
+            seoTitle: row.seoTitle,
+            content: row.content,
+            metaDescription: row.metaDescription,
+            slug: row.slug,
+            primaryKeyword: row.primaryKeyword,
+            secondaryKeywords: row.secondaryKeywords || [],
+            wordCount: row.wordCount,
+            qualityScore: row.qualityScore || {
+              overall: 0,
+              readability: 0,
+              seo: 0,
+              eeat: 0,
+              uniqueness: 0,
+              factAccuracy: 0,
+            },
+            internalLinks: row.internalLinks || [],
+            schema: row.schema,
+            serpAnalysis: row.serpAnalysis,
+            neuronWriterQueryId: row.neuronwriterQueryId,
+            generatedAt: row.generatedAt?.toISOString(),
+            model: row.model,
+          };
+        }
+
+        res.json({ success: true, data: store });
+      } catch (error) {
+        console.error("[API] Load blog posts error:", error);
+        res.status(500).json({ success: false, error: "Failed to load blog posts" });
       }
+    });
 
-      res.json({ success: true, data: store });
-    } catch (error) {
-      console.error("[API] Load blog posts error:", error);
-      res.status(500).json({ success: false, error: "Failed to load blog posts" });
-    }
-  });
+    app.post("/api/blog-posts", async (req: Request, res: Response) => {
+      try {
+        const { itemId, content } = req.body;
+        if (!itemId || !content) {
+          return res.status(400).json({ success: false, error: "Missing itemId or content" });
+        }
 
-  app.post("/api/blog-posts", async (req: Request, res: Response) => {
-    try {
-      const { itemId, content } = req.body;
-      if (!itemId || !content) {
-        return res.status(400).json({ success: false, error: "Missing itemId or content" });
-      }
-
-      await db
-        .insert(generatedBlogPosts)
-        .values({
-          id: content.id,
-          itemId,
-          title: content.title,
-          seoTitle: content.seoTitle,
-          content: content.content,
-          metaDescription: content.metaDescription,
-          slug: content.slug,
-          primaryKeyword: content.primaryKeyword,
-          secondaryKeywords: content.secondaryKeywords,
-          wordCount: content.wordCount,
-          qualityScore: content.qualityScore,
-          internalLinks: content.internalLinks,
-          schema: content.schema,
-          serpAnalysis: content.serpAnalysis,
-          neuronwriterQueryId: content.neuronWriterQueryId,
-          generatedAt: content.generatedAt ? new Date(content.generatedAt) : new Date(),
-          model: content.model,
-        })
-        .onConflictDoUpdate({
-          target: generatedBlogPosts.itemId,
-          set: {
+        await db!
+          .insert(generatedBlogPosts)
+          .values({
+            id: content.id,
+            itemId,
             title: content.title,
             seoTitle: content.seoTitle,
             content: content.content,
@@ -118,27 +100,47 @@ export function registerRoutes(app: Express): void {
             neuronwriterQueryId: content.neuronWriterQueryId,
             generatedAt: content.generatedAt ? new Date(content.generatedAt) : new Date(),
             model: content.model,
-            updatedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: generatedBlogPosts.itemId,
+            set: {
+              title: content.title,
+              seoTitle: content.seoTitle,
+              content: content.content,
+              metaDescription: content.metaDescription,
+              slug: content.slug,
+              primaryKeyword: content.primaryKeyword,
+              secondaryKeywords: content.secondaryKeywords,
+              wordCount: content.wordCount,
+              qualityScore: content.qualityScore,
+              internalLinks: content.internalLinks,
+              schema: content.schema,
+              serpAnalysis: content.serpAnalysis,
+              neuronwriterQueryId: content.neuronWriterQueryId,
+              generatedAt: content.generatedAt ? new Date(content.generatedAt) : new Date(),
+              model: content.model,
+              updatedAt: new Date(),
+            },
+          });
 
-      res.json({ success: true });
-    } catch (error) {
-      console.error("[API] Save blog post error:", error);
-      res.status(500).json({ success: false, error: "Failed to save blog post" });
-    }
-  });
+        res.json({ success: true });
+      } catch (error) {
+        console.error("[API] Save blog post error:", error);
+        res.status(500).json({ success: false, error: "Failed to save blog post" });
+      }
+    });
 
-  app.delete("/api/blog-posts/:itemId", async (req: Request, res: Response) => {
-    try {
-      const { itemId } = req.params;
-      await db.delete(generatedBlogPosts).where(eq(generatedBlogPosts.itemId, itemId));
-      res.json({ success: true });
-    } catch (error) {
-      console.error("[API] Delete blog post error:", error);
-      res.status(500).json({ success: false, error: "Failed to delete blog post" });
-    }
-  });
+    app.delete("/api/blog-posts/:itemId", async (req: Request, res: Response) => {
+      try {
+        const { itemId } = req.params;
+        await db!.delete(generatedBlogPosts).where(eq(generatedBlogPosts.itemId, itemId));
+        res.json({ success: true });
+      } catch (error) {
+        console.error("[API] Delete blog post error:", error);
+        res.status(500).json({ success: false, error: "Failed to delete blog post" });
+      }
+    });
+  }
 
   app.post("/api/neuronwriter-proxy", async (req: Request, res: Response) => {
     try {
