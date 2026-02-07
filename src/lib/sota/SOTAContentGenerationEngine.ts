@@ -114,75 +114,92 @@ export class SOTAContentGenerationEngine {
 
   async generateWithModel(params: GenerationParams): Promise<GenerationResult> {
     const { prompt, model, systemPrompt, temperature = 0.7, maxTokens } = params;
-    const startTime = Date.now();
-    const apiKey = this.getApiKey(model);
 
-    if (!apiKey) {
-      throw new Error(`No API key configured for ${model}`);
+    // Build ordered model list: requested model first, then fallbacks
+    const modelsToTry: AIModel[] = [model];
+    for (const fallback of this.getAvailableModels()) {
+      if (!modelsToTry.includes(fallback)) modelsToTry.push(fallback);
     }
 
-    // Check cache first
-    const cacheKey = { prompt, model, systemPrompt };
-    const cached = generationCache.get<GenerationResult>(cacheKey);
-    if (cached) {
-      generationCache.recordHit();
-      this.log(`Cache hit for ${model}`);
-      return cached;
-    }
-    generationCache.recordMiss();
+    let lastError: Error | null = null;
 
-    const config = this.modelConfigs[model];
-    const finalMaxTokens = maxTokens || config.maxTokens;
+    for (const currentModel of modelsToTry) {
+      const apiKey = this.getApiKey(currentModel);
+      if (!apiKey) continue;
 
-    let content = '';
-    let tokensUsed = 0;
+      const startTime = Date.now();
 
-    try {
-      if (model === 'gemini') {
-        content = await this.callGemini(apiKey, prompt, systemPrompt, temperature, finalMaxTokens);
-      } else if (model === 'openai') {
-        const result = await this.callOpenAI(apiKey, prompt, systemPrompt, temperature, finalMaxTokens);
-        content = result.content;
-        tokensUsed = result.tokens;
-      } else if (model === 'anthropic') {
-        const result = await this.callAnthropic(apiKey, prompt, systemPrompt, temperature, finalMaxTokens);
-        content = result.content;
-        tokensUsed = result.tokens;
-      } else if (model === 'openrouter' || model === 'groq') {
-        const result = await this.callOpenAICompatible(
-          model === 'openrouter' ? config.endpoint : config.endpoint,
-          apiKey,
-          config.modelId,
-          prompt,
-          systemPrompt,
-          temperature,
-          finalMaxTokens
-        );
-        content = result.content;
-        tokensUsed = result.tokens;
+      // Check cache first
+      const cacheKey = { prompt, model: currentModel, systemPrompt };
+      const cached = generationCache.get<GenerationResult>(cacheKey);
+      if (cached) {
+        generationCache.recordHit();
+        this.log(`Cache hit for ${currentModel}`);
+        return cached;
       }
-    } catch (error) {
-      const isTimeout = error instanceof Error && error.name === 'AbortError';
-      const msg = isTimeout
-        ? `${model} API request timed out after 120s`
-        : `Error with ${model}: ${error}`;
-      this.log(msg);
-      throw isTimeout ? new Error(msg) : error;
+      generationCache.recordMiss();
+
+      const config = this.modelConfigs[currentModel];
+      const finalMaxTokens = maxTokens || config.maxTokens;
+
+      let content = '';
+      let tokensUsed = 0;
+
+      try {
+        if (currentModel === 'gemini') {
+          content = await this.callGemini(apiKey, prompt, systemPrompt, temperature, finalMaxTokens);
+        } else if (currentModel === 'openai') {
+          const result = await this.callOpenAI(apiKey, prompt, systemPrompt, temperature, finalMaxTokens);
+          content = result.content;
+          tokensUsed = result.tokens;
+        } else if (currentModel === 'anthropic') {
+          const result = await this.callAnthropic(apiKey, prompt, systemPrompt, temperature, finalMaxTokens);
+          content = result.content;
+          tokensUsed = result.tokens;
+        } else if (currentModel === 'openrouter' || currentModel === 'groq') {
+          const result = await this.callOpenAICompatible(
+            config.endpoint,
+            apiKey,
+            config.modelId,
+            prompt,
+            systemPrompt,
+            temperature,
+            finalMaxTokens
+          );
+          content = result.content;
+          tokensUsed = result.tokens;
+        }
+
+        if (!content || content.trim().length === 0) {
+          throw new Error(`${currentModel} returned empty content`);
+        }
+
+        const result: GenerationResult = {
+          content,
+          model: currentModel,
+          tokensUsed,
+          duration: Date.now() - startTime,
+          cached: false
+        };
+
+        generationCache.set(cacheKey, Promise.resolve(result));
+        return result;
+      } catch (error) {
+        const isTimeout = error instanceof Error && error.name === 'AbortError';
+        const msg = isTimeout
+          ? `${currentModel} timed out after 120s`
+          : `${currentModel} failed: ${error instanceof Error ? error.message : error}`;
+        this.log(msg);
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (modelsToTry.indexOf(currentModel) < modelsToTry.length - 1) {
+          const nextModel = modelsToTry[modelsToTry.indexOf(currentModel) + 1];
+          this.log(`Falling back to ${nextModel}...`);
+        }
+      }
     }
 
-    const result: GenerationResult = {
-      content,
-      model,
-      tokensUsed,
-      duration: Date.now() - startTime,
-      cached: false
-    };
-
-    // Cache the result
-    const resultPromise = Promise.resolve(result);
-    generationCache.set(cacheKey, resultPromise);
-
-    return result;
+    throw lastError || new Error('All AI models failed. Check your API keys and try again.');
   }
 
   private async callGemini(
@@ -251,7 +268,15 @@ export class SOTAContentGenerationEngine {
     }, 120000);
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorBody = await response.text().catch(() => '');
+      let detail = '';
+      try {
+        const errJson = JSON.parse(errorBody);
+        detail = errJson.error?.message || errJson.message || errorBody.slice(0, 300);
+      } catch {
+        detail = errorBody.slice(0, 300);
+      }
+      throw new Error(`OpenAI API error ${response.status}: ${detail}`);
     }
 
     const data = await response.json();
@@ -327,7 +352,15 @@ export class SOTAContentGenerationEngine {
     }, 120000);
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorBody = await response.text().catch(() => '');
+      let detail = '';
+      try {
+        const errJson = JSON.parse(errorBody);
+        detail = errJson.error?.message || errJson.message || errorBody.slice(0, 300);
+      } catch {
+        detail = errorBody.slice(0, 300);
+      }
+      throw new Error(`${modelId} API error ${response.status}: ${detail}`);
     }
 
     const data = await response.json();

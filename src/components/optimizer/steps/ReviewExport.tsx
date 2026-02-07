@@ -396,7 +396,8 @@ export function ReviewExport() {
           keyword: item.primaryKeyword,
         });
       } catch (error) {
-        const errorMsg = String(error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(`[ReviewExport] Generation failed for "${item.title}":`, error);
         updateContentItem(item.id, { status: 'error', error: errorMsg });
         setGeneratingItems(prev => prev.map(gi => 
           gi.id === item.id ? { ...gi, status: 'error', error: errorMsg } : gi
