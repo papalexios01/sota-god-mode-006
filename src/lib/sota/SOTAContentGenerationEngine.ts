@@ -94,6 +94,13 @@ export class SOTAContentGenerationEngine {
     console.log(`[SOTA Engine] ${message}`);
   }
 
+  private fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 120000): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+  }
+
   private getApiKey(model: AIModel): string | undefined {
     const keyMap: Record<AIModel, keyof APIKeys> = {
       gemini: 'geminiApiKey',
@@ -155,8 +162,12 @@ export class SOTAContentGenerationEngine {
         tokensUsed = result.tokens;
       }
     } catch (error) {
-      this.log(`Error with ${model}: ${error}`);
-      throw error;
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      const msg = isTimeout
+        ? `${model} API request timed out after 120s`
+        : `Error with ${model}: ${error}`;
+      this.log(msg);
+      throw isTimeout ? new Error(msg) : error;
     }
 
     const result: GenerationResult = {
@@ -197,11 +208,11 @@ export class SOTAContentGenerationEngine {
       requestBody.system_instruction = { parts: [{ text: systemPrompt }] };
     }
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody)
-    });
+    }, 120000);
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
@@ -225,7 +236,7 @@ export class SOTAContentGenerationEngine {
     }
     messages.push({ role: 'user', content: prompt });
 
-    const response = await fetch(this.modelConfigs.openai.endpoint, {
+    const response = await this.fetchWithTimeout(this.modelConfigs.openai.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -237,7 +248,7 @@ export class SOTAContentGenerationEngine {
         temperature,
         max_tokens: maxTokens
       })
-    });
+    }, 120000);
 
     if (!response.ok) {
       throw new Error(`OpenAI API error: ${response.status}`);
@@ -257,7 +268,7 @@ export class SOTAContentGenerationEngine {
     temperature: number = 0.7,
     maxTokens: number = 4096
   ): Promise<{ content: string; tokens: number }> {
-    const response = await fetch(this.modelConfigs.anthropic.endpoint, {
+    const response = await this.fetchWithTimeout(this.modelConfigs.anthropic.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -272,7 +283,7 @@ export class SOTAContentGenerationEngine {
         messages: [{ role: 'user', content: prompt }],
         temperature
       })
-    });
+    }, 120000);
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
@@ -301,7 +312,7 @@ export class SOTAContentGenerationEngine {
     }
     messages.push({ role: 'user', content: prompt });
 
-    const response = await fetch(endpoint, {
+    const response = await this.fetchWithTimeout(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -313,7 +324,7 @@ export class SOTAContentGenerationEngine {
         temperature,
         max_tokens: maxTokens
       })
-    });
+    }, 120000);
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
